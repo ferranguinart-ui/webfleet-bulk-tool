@@ -640,6 +640,12 @@
       display: grid; grid-template-columns: repeat(4, 1fr);
       gap: 14px; margin-bottom: 22px;
     }
+    .kpi-grid-fuel { grid-template-columns: repeat(2, 1fr); }
+    .kpi-section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .12em; color: var(--t3);
+      margin-bottom: 10px;
+    }
     .kpi-card {
       background: var(--s1); border: 1px solid var(--border);
       border-radius: 12px; padding: 20px; transition: all .2s;
@@ -2273,11 +2279,27 @@ function renderDashboard(data) {
   const vehs = data.vehicles || [];
   const now  = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
 
-  // KPIs
+  // KPIs — generales
   const total    = objs.length;
   const moving   = objs.filter(o => (o.pos_speed || 0) > 0).length;
   const maxSpeed = objs.reduce((m, o) => Math.max(m, o.pos_speed || 0), 0);
   const totalKm  = vehs.reduce((s, v) => s + (v.mileage || 0), 0);
+
+  // KPIs — combustible (fuente: showVehicleReportExtern → data.vehicles)
+  // Criterio vh_avgfuelusage: > 0 (0 significa sin dato; null/undefined/string = excluido)
+  const withFuelUsage = vehs.filter(v => {
+    const n = parseFloat(v.vh_avgfuelusage);
+    return !isNaN(n) && isFinite(n) && n > 0;
+  }).length;
+
+  // Criterio vh_fuellevel: >= 0 con valor numérico válido.
+  // DECISIÓN: 0 se trata como lectura válida (depósito vacío con sensor activo).
+  // Webfleet devuelve null/undefined cuando el vehículo no dispone de sensor de nivel.
+  // Si en tu flota detectas falsos positivos con valor 0, cambia n >= 0 → n > 0.
+  const withFuelLevel = vehs.filter(v => {
+    const n = parseFloat(v.vh_fuellevel);
+    return !isNaN(n) && isFinite(n) && n >= 0;
+  }).length;
   // pos_speed in Webfleet is in 1/100 km/h
   const maxSpeedKmh = Math.round(maxSpeed / 100);
   const totalKmFormatted = totalKm > 0
@@ -2305,12 +2327,19 @@ function renderDashboard(data) {
     +   '</div>'
     + '</div>'
 
-    // KPI cards
+    // KPI cards — flota general
     + '<div class="kpi-grid">'
     +   kpiCard('🚗', total.toString(), 'Total Vehículos', '', 'kpi-blue')
     +   kpiCard('▶', moving.toString(), 'En Movimiento', (total ? Math.round(moving/total*100) : 0) + '% de la flota', 'kpi-green')
     +   kpiCard('⚡', (total - moving).toString(), 'Detenidos', '', 'kpi-orng')
     +   kpiCard('📍', maxSpeedKmh + ' km/h', 'Vel. Máx. Actual', 'velocidad punta en flota', 'kpi-red')
+    + '</div>'
+
+    // KPI cards — combustible
+    + '<div class="kpi-section-label">Combustible</div>'
+    + '<div class="kpi-grid kpi-grid-fuel">'
+    +   kpiCard('⛽', withFuelUsage.toString(), 'Reportan Consumo', (total ? Math.round(withFuelUsage/total*100) : 0) + '% de la flota · vh_avgfuelusage > 0', 'kpi-orng')
+    +   kpiCard('🪣', withFuelLevel.toString(), 'Reportan Nivel', (total ? Math.round(withFuelLevel/total*100) : 0) + '% de la flota · vh_fuellevel ≥ 0', 'kpi-green')
     + '</div>'
 
     // Charts row 1
