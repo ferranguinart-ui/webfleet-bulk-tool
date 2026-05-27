@@ -1072,6 +1072,21 @@
     .fg-sep-lbl::after {
       content: ''; flex: 1; height: 1px; background: var(--border);
     }
+
+    /* ══════════════════════════════════════════════════ LANG TOGGLE */
+    .lang-toggle {
+      display: flex; align-items: center; gap: 2px;
+      background: var(--s2); border: 1px solid var(--border2);
+      border-radius: 20px; padding: 3px;
+    }
+    .lang-btn {
+      padding: 3px 11px; border-radius: 14px;
+      font-size: 11px; font-weight: 700; cursor: pointer;
+      border: none; background: transparent; color: var(--t3);
+      transition: all .15s; font-family: var(--font); letter-spacing: .04em;
+    }
+    .lang-btn.active { background: var(--red); color: #fff; }
+    .lang-btn:not(.active):hover { color: var(--t1); }
   </style>
 </head>
 <body>
@@ -1084,11 +1099,15 @@
     <span class="logo-pill">API v1.73</span>
   </div>
   <div class="header-right">
+    <div class="lang-toggle">
+      <button class="lang-btn active" id="langEs" onclick="setLang('es')">ES</button>
+      <button class="lang-btn" id="langEn" onclick="setLang('en')">EN</button>
+    </div>
     <div id="credStatus">
       <span class="cred-dot"></span>
       <span id="credText">Sin configurar</span>
     </div>
-    <button class="btn btn-header" onclick="openModal()">⚙ Credenciales</button>
+    <button id="credBtn" class="btn btn-header" onclick="openModal()">⚙ Credenciales</button>
   </div>
 </header>
 
@@ -1182,6 +1201,523 @@
 <div class="toast" id="toast"></div>
 
 <script>
+/* ── i18n ───────────────────────────────────────────────────────────────── */
+let currentLang = localStorage.getItem('wf_lang') || 'es';
+
+const TRANSLATIONS = {
+  es: {
+    // Header
+    notConfigured: 'Sin configurar',
+    credentials: 'Credenciales',
+    // Modal
+    connectionCredentials: 'Credenciales de conexión',
+    passwordPlaceholder: 'contraseña',
+    aiOptional: 'Inteligencia Artificial (opcional)',
+    aiKeyHint: '(para insights en el dashboard)',
+    cancel: 'Cancelar',
+    saveConnection: 'Guardar conexión',
+    // Welcome
+    actionsAvailable: 'acciones disponibles',
+    welcomeH1: 'Operaciones<br><em>masivas</em> en<br>segundos.',
+    welcomeSubtitle: 'Ejecuta inserciones y actualizaciones en masa sobre la API de Webfleet usando simples archivos CSV. Sin código, sin errores manuales.',
+    step1: 'Configura tus credenciales de acceso',
+    step2: 'Descarga la plantilla CSV de la acción',
+    step3: 'Sube el CSV relleno y ejecuta en masa',
+    configureCredentials: 'Configurar credenciales',
+    // Sidebar
+    fleetDashboard: 'Dashboard de Flota',
+    aiAgent: 'Agente IA',
+    synchronization: 'Sincronización',
+    actionsHeader: 'Acciones',
+    // Action view
+    columnReference: 'Referencia de columnas',
+    fieldCol: 'Campo',
+    descriptionCol: 'Descripción',
+    reqCol: 'Req.',
+    connectionStatus: 'Estado de conexión',
+    csvTemplate: 'Plantilla CSV',
+    csvTemplateHint: 'Descarga la plantilla, rellena cada fila con los datos (una fila = un registro) y sube el archivo.',
+    uploadAndExecute: 'Subir y ejecutar',
+    clickOrDrag: '<strong>Haz clic</strong> o arrastra el CSV aquí',
+    previewChanges: '🔍 Vista previa de cambios',
+    executeInBulk: 'EJECUTAR EN MASA',
+    // Credential check
+    connectedAs: 'Conectado como',
+    noUser: 'sin usuario',
+    noCredentials: 'Sin credenciales —',
+    configureNow: 'Configurar ahora',
+    // Run bulk
+    savingSnapshot: 'GUARDANDO SNAPSHOT...',
+    executing: 'EJECUTANDO...',
+    // Results
+    executionResults: 'Resultados de la ejecución',
+    totalLbl: 'Total',
+    correctLbl: 'Correctos',
+    errorsLbl: 'Errores',
+    exportErrors: 'Exportar errores',
+    exportAll: 'Exportar todos',
+    statusCol: 'Estado',
+    detailCol: 'Detalle',
+    unknownErr: 'desconocido',
+    // Snapshot
+    snapshotSavedAt: 'Snapshot guardado a las',
+    recordsLbl: 'registros',
+    snapshotInfo: 'Si algo salió mal, puedes restaurar el estado anterior.',
+    downloadSnapshot: '⬇ Descargar snapshot',
+    restoreState: '↩ Restaurar estado anterior',
+    restoreConfirmPart1: '¿Restaurar el estado anterior de',
+    restoreConfirmPart2: 'registros? Esta acción es irreversible.',
+    restoring: 'Restaurando...',
+    restoredOk: 'correctos',
+    restoredErr: 'errores',
+    // Diff
+    readingWebfleet: 'Leyendo estado actual en Webfleet...',
+    comparingCsv: 'Comparando con los valores del CSV',
+    changesPreviewTitle: 'Vista previa de cambios — ',
+    recordsInCsv: 'registros en el CSV',
+    withRealChanges: 'con cambios reales',
+    withoutChanges: 'sin cambios (se omitirán)',
+    notFoundInWebfleet: 'no encontrados en Webfleet',
+    totalModifications: 'modificaciones en total',
+    detectedChanges: 'Cambios detectados',
+    noChanges: 'Sin cambios',
+    notFoundWarn: '⚠ No encontrado en Webfleet',
+    fieldsWithoutChange: 'campo(s) sin cambio',
+    changesWillBeApplied: 'Se aplicarán',
+    changesWord: 'cambios',
+    overWord: 'sobre',
+    recordsWord: 'registros',
+    recordsNotFoundIgnored: 'registros no encontrados serán ignorados por Webfleet.',
+    confirmAndExecute: '✓ Confirmar y ejecutar',
+    diffCancelBtn: 'Cancelar',
+    errorReadingWebfleet: 'Error al leer datos actuales',
+    previewNotAvailable: 'Vista previa no disponible para esta acción',
+    consultingWebfleet: 'Consultando Webfleet...',
+    // Sync
+    syncPageTitle: 'Sincronización',
+    syncPageEm: 'con Fuente Externa',
+    syncSubtitle: 'Sube el fichero maestro de tu cliente (ERP, RRHH, Excel…) y el sistema detectará qué hay que insertar, actualizar o dejar como está en Webfleet.',
+    vehiclesLbl: 'Vehículos',
+    driversLbl: 'Conductores',
+    addressesLbl: 'Direcciones',
+    updateOnly: 'Solo actualización',
+    insertUpdate: 'Inserción + actualización',
+    sourceFileLbl: 'Fichero fuente (CSV o TXT)',
+    uploadSourceFile: 'Subir fichero fuente de verdad',
+    analyzeDifferences: '🔄 Analizar diferencias',
+    clearLbl: 'Limpiar',
+    comparingWebfleet: 'Leyendo estado actual en Webfleet y comparando…',
+    toInsertLbl: 'A insertar',
+    newRecordsLbl: 'Nuevos registros',
+    noInsertAction: 'Sin acción de inserción',
+    toUpdateLbl: 'A actualizar',
+    recordsWithChanges: 'Registros con cambios',
+    alreadySynced: 'Ya sincronizados',
+    noChangesSyncLbl: 'Sin cambios',
+    insertNewBtn: '▶ Insertar nuevos',
+    updateModifiedBtn: '▶ Actualizar modificados',
+    totalToProcess: 'Total a procesar:',
+    noChangesCount: 'Sin cambios:',
+    executeAllBtn: '▶ Ejecutar todo',
+    allSyncedMsg: 'Todo está sincronizado. No hay diferencias entre el fichero y Webfleet.',
+    noInsertActionAvail: '[sin acción de inserción disponible]',
+    // Agent
+    agentPageTitle: 'Agente <em>IA</em> de Operaciones',
+    agentSubtitle: 'Pega los datos del cliente en cualquier formato (CSV, tabla de Excel, texto libre…) o sube un fichero.<br>El agente detectará qué operación realizar, mapeará los campos y te pedirá confirmación antes de ejecutar.',
+    clientDataLbl: 'Datos del cliente',
+    agentPlaceholder: 'Pega aquí los datos... Ejemplos:\n\nNombre,Matrícula,Color,Velocidad máx\nFurgón Madrid,1234ABC,blanco,120\nCamión Norte,5678DEF,negro,90\n\nO texto libre:\nActualizar los vehículos: Furgón Madrid con matrícula 1234ABC color blanco límite 120',
+    orSeparator: 'o',
+    uploadFileLbl: 'Subir fichero (CSV, TXT, TSV)',
+    interpretWithAI: 'Interpretar con IA',
+    interpretingLbl: 'Interpretando...',
+    analyzingData: 'El agente está analizando los datos...',
+    problemsDetected: 'problema(s) detectado(s) — revisa antes de ejecutar.',
+    confidenceLbl: '% confianza',
+    reviewBeforeExecute: '⚠ Revisa los errores antes de ejecutar',
+    executeThisBatch: '▶ Ejecutar este batch',
+    recordsInOps: 'registros en',
+    opsReadyText: 'operaciones listas para ejecutar',
+    executeAllText: '▶ EJECUTAR TODO',
+    executing2: 'Ejecutando...',
+    actionLbl: 'acción',
+    // Dashboard
+    dashTitle: 'Dashboard de <em>Flota</em>',
+    updatedAt: 'Actualizado a las',
+    vehiclesCount: 'vehículos',
+    refreshBtn: '↺ Actualizar',
+    analyzeWithAI: '✦ Analizar con IA',
+    aiNoKey: '✦ IA (sin clave)',
+    totalVehicles: 'Total Vehículos',
+    movingLbl: 'En Movimiento',
+    ofFleet: '% de la flota',
+    stoppedLbl: 'Detenidos',
+    maxSpeedCurrent: 'Vel. Máx. Actual',
+    topFleetSpeed: 'velocidad punta en flota',
+    fuelSection: 'Combustible',
+    reportConsumption: 'Reportan Consumo',
+    reportLevel: 'Reportan Nivel',
+    top10ByMileage: 'Top 10 Vehículos por Kilometraje',
+    activityStatus: 'Estado de Actividad',
+    vehicleType: 'Tipo de Vehículo',
+    speedDistribution: 'Distribución de Velocidades Actuales',
+    movingChart: 'En movimiento',
+    stoppedChart: 'Detenidos',
+    unknownType: 'Desconocido',
+    stoppedSpeed: 'Detenido (0)',
+    aiFleetAnalysis: 'Análisis de Flota — Experto Senior',
+    pressAnalyzeAI: 'Pulsa <strong>Analizar con IA</strong> para obtener insights de un analista senior de gestión de flotas.',
+    configAnthropicDash: 'Configura tu <strong>Anthropic API Key</strong> en Credenciales para activar el análisis con IA.',
+    analyzingLbl: '⏳ Analizando...',
+    analystProcessing: 'El analista está procesando tu flota...',
+    noCredentialsDash: 'Sin credenciales',
+    configureForDash: 'Configura tu cuenta y API Key de Webfleet para ver el dashboard.',
+    loadingFleetData: 'Cargando datos de flota...',
+    errorLoadingData: 'Error al cargar datos',
+    retryBtn: 'Reintentar',
+    // Toast messages
+    credentialsSaved: 'Credenciales guardadas',
+    configureFirst: 'Configura las credenciales primero',
+    selectCsv: 'Selecciona un archivo CSV',
+    configureAnthropicKey: 'Configura tu Anthropic API Key en Credenciales',
+    pasteOrUpload: 'Pega datos o sube un fichero',
+    configureWebfleet: 'Configura las credenciales de Webfleet',
+    uploadSourceFirst: 'Sube el fichero fuente primero',
+    noDataToExec: 'Sin datos que ejecutar',
+    loadDataFirst: 'Carga los datos primero',
+    snapshotDownloaded: 'Snapshot descargado',
+    // Action labels and categories
+    actionLabels: {
+      updateVehicle: 'Actualizar Vehículo',
+      insertDriverExtern: 'Insertar Conductor',
+      updateDriverExtern: 'Actualizar Conductor',
+      insertAddressExtern: 'Insertar Dirección',
+      updateAddressExtern: 'Actualizar Dirección',
+      sendOrderExtern: 'Enviar Orden',
+      updateOrderExtern: 'Actualizar Orden',
+      cancelOrderExtern: 'Cancelar Orden',
+      insertArea: 'Insertar Geocerca',
+      insertMaintenanceSchedule: 'Insertar Mantenimiento',
+      insertUser: 'Insertar Usuario',
+      updateUser: 'Actualizar Usuario',
+      insertObjectGroupExtern: 'Crear Grupo de Vehículos',
+      insertObjectGroupObjectExtern: 'Añadir Vehículo a Grupo',
+      insertDriverGroupExtern: 'Crear Grupo de Conductores',
+      insertDriverGroupDriverExtern: 'Añadir Conductor a Grupo',
+    },
+    categories: {
+      'Vehículos': 'Vehículos',
+      'Conductores': 'Conductores',
+      'Direcciones': 'Direcciones',
+      'Órdenes': 'Órdenes',
+      'Geocercas': 'Geocercas',
+      'Mantenimiento': 'Mantenimiento',
+      'Usuarios': 'Usuarios',
+      'Grupos de Vehículos': 'Grupos de Vehículos',
+      'Grupos de Conductores': 'Grupos de Conductores',
+    },
+  },
+
+  en: {
+    // Header
+    notConfigured: 'Not configured',
+    credentials: 'Credentials',
+    // Modal
+    connectionCredentials: 'Connection credentials',
+    passwordPlaceholder: 'password',
+    aiOptional: 'Artificial Intelligence (optional)',
+    aiKeyHint: '(for dashboard insights)',
+    cancel: 'Cancel',
+    saveConnection: 'Save connection',
+    // Welcome
+    actionsAvailable: 'available actions',
+    welcomeH1: 'Bulk<br><em>operations</em><br>in seconds.',
+    welcomeSubtitle: 'Execute bulk insertions and updates on the Webfleet API using simple CSV files. No code, no manual errors.',
+    step1: 'Configure your access credentials',
+    step2: 'Download the action CSV template',
+    step3: 'Upload the filled CSV and execute in bulk',
+    configureCredentials: 'Configure credentials',
+    // Sidebar
+    fleetDashboard: 'Fleet Dashboard',
+    aiAgent: 'AI Agent',
+    synchronization: 'Synchronization',
+    actionsHeader: 'Actions',
+    // Action view
+    columnReference: 'Column reference',
+    fieldCol: 'Field',
+    descriptionCol: 'Description',
+    reqCol: 'Req.',
+    connectionStatus: 'Connection status',
+    csvTemplate: 'CSV Template',
+    csvTemplateHint: 'Download the template, fill each row with data (one row = one record) and upload the file.',
+    uploadAndExecute: 'Upload and execute',
+    clickOrDrag: '<strong>Click</strong> or drag the CSV here',
+    previewChanges: '🔍 Preview changes',
+    executeInBulk: 'BULK EXECUTE',
+    // Credential check
+    connectedAs: 'Connected as',
+    noUser: 'no user',
+    noCredentials: 'No credentials —',
+    configureNow: 'Configure now',
+    // Run bulk
+    savingSnapshot: 'SAVING SNAPSHOT...',
+    executing: 'EXECUTING...',
+    // Results
+    executionResults: 'Execution results',
+    totalLbl: 'Total',
+    correctLbl: 'Correct',
+    errorsLbl: 'Errors',
+    exportErrors: 'Export errors',
+    exportAll: 'Export all',
+    statusCol: 'Status',
+    detailCol: 'Detail',
+    unknownErr: 'unknown',
+    // Snapshot
+    snapshotSavedAt: 'Snapshot saved at',
+    recordsLbl: 'records',
+    snapshotInfo: 'If something went wrong, you can restore the previous state.',
+    downloadSnapshot: '⬇ Download snapshot',
+    restoreState: '↩ Restore previous state',
+    restoreConfirmPart1: 'Restore previous state of',
+    restoreConfirmPart2: 'records? This action is irreversible.',
+    restoring: 'Restoring...',
+    restoredOk: 'correct',
+    restoredErr: 'errors',
+    // Diff
+    readingWebfleet: 'Reading current state in Webfleet...',
+    comparingCsv: 'Comparing with CSV values',
+    changesPreviewTitle: 'Changes preview — ',
+    recordsInCsv: 'records in the CSV',
+    withRealChanges: 'with real changes',
+    withoutChanges: 'without changes (will be skipped)',
+    notFoundInWebfleet: 'not found in Webfleet',
+    totalModifications: 'total modifications',
+    detectedChanges: 'Detected changes',
+    noChanges: 'No changes',
+    notFoundWarn: '⚠ Not found in Webfleet',
+    fieldsWithoutChange: 'field(s) without change',
+    changesWillBeApplied: 'Will apply',
+    changesWord: 'changes',
+    overWord: 'over',
+    recordsWord: 'records',
+    recordsNotFoundIgnored: 'records not found will be ignored by Webfleet.',
+    confirmAndExecute: '✓ Confirm and execute',
+    diffCancelBtn: 'Cancel',
+    errorReadingWebfleet: 'Error reading current data',
+    previewNotAvailable: 'Preview not available for this action',
+    consultingWebfleet: 'Querying Webfleet...',
+    // Sync
+    syncPageTitle: 'Synchronization',
+    syncPageEm: 'with External Source',
+    syncSubtitle: "Upload your client's master file (ERP, HR, Excel…) and the system will detect what needs to be inserted, updated, or left as is in Webfleet.",
+    vehiclesLbl: 'Vehicles',
+    driversLbl: 'Drivers',
+    addressesLbl: 'Addresses',
+    updateOnly: 'Update only',
+    insertUpdate: 'Insert + update',
+    sourceFileLbl: 'Source file (CSV or TXT)',
+    uploadSourceFile: 'Upload source truth file',
+    analyzeDifferences: '🔄 Analyze differences',
+    clearLbl: 'Clear',
+    comparingWebfleet: 'Reading current state in Webfleet and comparing…',
+    toInsertLbl: 'To insert',
+    newRecordsLbl: 'New records',
+    noInsertAction: 'No insert action',
+    toUpdateLbl: 'To update',
+    recordsWithChanges: 'Records with changes',
+    alreadySynced: 'Already synced',
+    noChangesSyncLbl: 'No changes',
+    insertNewBtn: '▶ Insert new',
+    updateModifiedBtn: '▶ Update modified',
+    totalToProcess: 'Total to process:',
+    noChangesCount: 'No changes:',
+    executeAllBtn: '▶ Execute all',
+    allSyncedMsg: 'Everything is synchronized. No differences between the file and Webfleet.',
+    noInsertActionAvail: '[no insert action available]',
+    // Agent
+    agentPageTitle: 'Operations <em>AI</em> Agent',
+    agentSubtitle: 'Paste client data in any format (CSV, Excel table, free text…) or upload a file.<br>The agent will detect what operation to perform, map the fields and ask for confirmation before executing.',
+    clientDataLbl: 'Client data',
+    agentPlaceholder: 'Paste data here... Examples:\n\nName,Plate,Color,Max Speed\nMadrid Van,1234ABC,white,120\nNorth Truck,5678DEF,black,90\n\nOr free text:\nUpdate vehicles: Madrid Van with plate 1234ABC white color speed limit 120',
+    orSeparator: 'or',
+    uploadFileLbl: 'Upload file (CSV, TXT, TSV)',
+    interpretWithAI: 'Interpret with AI',
+    interpretingLbl: 'Interpreting...',
+    analyzingData: 'The agent is analyzing the data...',
+    problemsDetected: 'problem(s) detected — review before executing.',
+    confidenceLbl: '% confidence',
+    reviewBeforeExecute: '⚠ Review errors before executing',
+    executeThisBatch: '▶ Execute this batch',
+    recordsInOps: 'records in',
+    opsReadyText: 'operations ready to execute',
+    executeAllText: '▶ EXECUTE ALL',
+    executing2: 'Executing...',
+    actionLbl: 'action',
+    // Dashboard
+    dashTitle: 'Fleet <em>Dashboard</em>',
+    updatedAt: 'Updated at',
+    vehiclesCount: 'vehicles',
+    refreshBtn: '↺ Refresh',
+    analyzeWithAI: '✦ Analyze with AI',
+    aiNoKey: '✦ AI (no key)',
+    totalVehicles: 'Total Vehicles',
+    movingLbl: 'Moving',
+    ofFleet: '% of fleet',
+    stoppedLbl: 'Stopped',
+    maxSpeedCurrent: 'Current Max Speed',
+    topFleetSpeed: 'top fleet speed',
+    fuelSection: 'Fuel',
+    reportConsumption: 'Report Consumption',
+    reportLevel: 'Report Level',
+    top10ByMileage: 'Top 10 Vehicles by Mileage',
+    activityStatus: 'Activity Status',
+    vehicleType: 'Vehicle Type',
+    speedDistribution: 'Current Speed Distribution',
+    movingChart: 'Moving',
+    stoppedChart: 'Stopped',
+    unknownType: 'Unknown',
+    stoppedSpeed: 'Stopped (0)',
+    aiFleetAnalysis: 'Fleet Analysis — Senior Expert',
+    pressAnalyzeAI: 'Press <strong>Analyze with AI</strong> to get insights from a senior fleet management analyst.',
+    configAnthropicDash: 'Configure your <strong>Anthropic API Key</strong> in Credentials to activate AI analysis.',
+    analyzingLbl: '⏳ Analyzing...',
+    analystProcessing: 'The analyst is processing your fleet...',
+    noCredentialsDash: 'No credentials',
+    configureForDash: 'Configure your Webfleet account and API Key to view the dashboard.',
+    loadingFleetData: 'Loading fleet data...',
+    errorLoadingData: 'Error loading data',
+    retryBtn: 'Retry',
+    // Toast messages
+    credentialsSaved: 'Credentials saved',
+    configureFirst: 'Configure credentials first',
+    selectCsv: 'Select a CSV file',
+    configureAnthropicKey: 'Configure your Anthropic API Key in Credentials',
+    pasteOrUpload: 'Paste data or upload a file',
+    configureWebfleet: 'Configure Webfleet credentials',
+    uploadSourceFirst: 'Upload the source file first',
+    noDataToExec: 'No data to execute',
+    loadDataFirst: 'Load data first',
+    snapshotDownloaded: 'Snapshot downloaded',
+    // Action labels and categories
+    actionLabels: {
+      updateVehicle: 'Update Vehicle',
+      insertDriverExtern: 'Insert Driver',
+      updateDriverExtern: 'Update Driver',
+      insertAddressExtern: 'Insert Address',
+      updateAddressExtern: 'Update Address',
+      sendOrderExtern: 'Send Order',
+      updateOrderExtern: 'Update Order',
+      cancelOrderExtern: 'Cancel Order',
+      insertArea: 'Insert Geofence',
+      insertMaintenanceSchedule: 'Insert Maintenance',
+      insertUser: 'Insert User',
+      updateUser: 'Update User',
+      insertObjectGroupExtern: 'Create Vehicle Group',
+      insertObjectGroupObjectExtern: 'Add Vehicle to Group',
+      insertDriverGroupExtern: 'Create Driver Group',
+      insertDriverGroupDriverExtern: 'Add Driver to Group',
+    },
+    categories: {
+      'Vehículos': 'Vehicles',
+      'Conductores': 'Drivers',
+      'Direcciones': 'Addresses',
+      'Órdenes': 'Orders',
+      'Geocercas': 'Geofences',
+      'Mantenimiento': 'Maintenance',
+      'Usuarios': 'Users',
+      'Grupos de Vehículos': 'Vehicle Groups',
+      'Grupos de Conductores': 'Driver Groups',
+    },
+  },
+};
+
+function t(key) {
+  return (TRANSLATIONS[currentLang] || TRANSLATIONS.es)[key] || (TRANSLATIONS.es)[key] || key;
+}
+function tAction(id) {
+  const labels = (TRANSLATIONS[currentLang] || TRANSLATIONS.es).actionLabels || {};
+  return labels[id] || id;
+}
+function tCategory(cat) {
+  const cats = (TRANSLATIONS[currentLang] || TRANSLATIONS.es).categories || {};
+  return cats[cat] || cat;
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('wf_lang', lang);
+  const esBtn = document.getElementById('langEs');
+  const enBtn = document.getElementById('langEn');
+  if (esBtn) esBtn.classList.toggle('active', lang === 'es');
+  if (enBtn) enBtn.classList.toggle('active', lang === 'en');
+  document.documentElement.lang = lang;
+  applyStaticTranslations();
+  // Re-render active view
+  const dashEl    = document.getElementById('dashboard');
+  const agentEl   = document.getElementById('agent');
+  const syncEl    = document.getElementById('sync');
+  const contentEl = document.getElementById('content');
+  if (dashEl   && dashEl.style.display   !== 'none') { if (dashData) renderDashboard(dashData); }
+  if (agentEl  && agentEl.style.display  !== 'none') renderAgentInput();
+  if (syncEl   && syncEl.style.display   !== 'none') renderSyncPage();
+  if (contentEl && contentEl.style.display !== 'none' && current) renderContent(current);
+  renderSidebar();
+  updateStatus();
+  if (current) updateCredCheck();
+}
+
+function applyStaticTranslations() {
+  // Header credentials button
+  const credBtn = document.getElementById('credBtn');
+  if (credBtn) credBtn.textContent = '⚙ ' + t('credentials');
+
+  // Credential status (only if not connected)
+  const cfg = getConfig();
+  const tx = document.getElementById('credText');
+  if (tx && !(cfg.account && cfg.apikey)) tx.textContent = t('notConfigured');
+
+  // Modal
+  const modalTitle = document.querySelector('.modal-hdr h2');
+  if (modalTitle) modalTitle.textContent = t('connectionCredentials');
+
+  const pwdInput = document.getElementById('cfg_password');
+  if (pwdInput) pwdInput.placeholder = t('passwordPlaceholder');
+
+  const aiSepLbl = document.querySelector('.fg-sep-lbl');
+  if (aiSepLbl) aiSepLbl.textContent = t('aiOptional');
+
+  const anthropicLabel = document.querySelector('label[for-input="cfg_anthropic"]');
+  // Select the label inside the last .fg in modal-body
+  const allFgs = document.querySelectorAll('.modal-body .fg');
+  if (allFgs.length) {
+    const lastFg = allFgs[allFgs.length - 1];
+    const lbl = lastFg.querySelector('label');
+    if (lbl) lbl.innerHTML = 'Anthropic API Key <span style="color:var(--t3);font-size:9px;font-weight:500;text-transform:none;letter-spacing:0;">' + t('aiKeyHint') + '</span>';
+  }
+
+  const modalCancel = document.querySelector('.modal-footer .btn-ghost');
+  if (modalCancel) modalCancel.textContent = t('cancel');
+  const modalSave = document.querySelector('.modal-footer .btn-red');
+  if (modalSave) modalSave.textContent = t('saveConnection');
+
+  // Welcome screen (static HTML, always patch)
+  const welcomeBadge = document.querySelector('.welcome-badge');
+  if (welcomeBadge) welcomeBadge.innerHTML = '<span></span> 16 ' + t('actionsAvailable');
+
+  const welcomeH1 = document.querySelector('.welcome h1');
+  if (welcomeH1) welcomeH1.innerHTML = t('welcomeH1');
+
+  const welcomeP = document.querySelector('.welcome > p');
+  if (welcomeP) welcomeP.textContent = t('welcomeSubtitle');
+
+  const stepTexts = document.querySelectorAll('.step-text');
+  if (stepTexts[0]) stepTexts[0].textContent = t('step1');
+  if (stepTexts[1]) stepTexts[1].textContent = t('step2');
+  if (stepTexts[2]) stepTexts[2].textContent = t('step3');
+
+  const welcomeBtn = document.querySelector('.welcome .btn-red');
+  if (welcomeBtn) welcomeBtn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> ' + t('configureCredentials');
+}
+
 /* ── State ─────────────────────────────────────────────────────────────── */
 let ACTIONS = {};
 let current = null;
@@ -1199,8 +1735,17 @@ let lastSnapshot = null; // stores rollback snapshot after each UPDATE execution
 
 /* ── Init ───────────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', async () => {
+  // Init language toggle buttons
+  const storedLang = localStorage.getItem('wf_lang') || 'es';
+  const esBtn = document.getElementById('langEs');
+  const enBtn = document.getElementById('langEn');
+  if (esBtn) esBtn.classList.toggle('active', storedLang === 'es');
+  if (enBtn) enBtn.classList.toggle('active', storedLang === 'en');
+  document.documentElement.lang = storedLang;
+
   loadConfig();
   updateStatus();
+  applyStaticTranslations();
   ACTIONS = await fetch('/api/actions').then(r => r.json());
   renderSidebar();
 });
@@ -1225,7 +1770,7 @@ function saveConfig() {
   closeModal();
   updateStatus();
   if (current) updateCredCheck();
-  toast('Credenciales guardadas', 'ok');
+  toast(t('credentialsSaved'), 'ok');
 }
 function getConfig() { return JSON.parse(localStorage.getItem('wf_cfg') || '{}'); }
 function updateStatus() {
@@ -1237,7 +1782,7 @@ function updateStatus() {
     tx.textContent = c.account;
   } else {
     el.className = '';
-    tx.textContent = 'Sin configurar';
+    tx.textContent = t('notConfigured');
   }
 }
 
@@ -1259,23 +1804,23 @@ function renderSidebar() {
   let html = '<div class="sidebar-dash">'
     + '<button class="sidebar-dash-btn" id="dashBtn" onclick="openDashboard()">'
     + '<span class="dash-icon">📊</span>'
-    + '<span>Dashboard de Flota</span>'
+    + '<span>' + t('fleetDashboard') + '</span>'
     + '</button>'
     + '<button class="sidebar-dash-btn" id="agentBtn" onclick="openAgent()" style="margin-top:4px;">'
     + '<span class="dash-icon">🤖</span>'
-    + '<span>Agente IA</span>'
+    + '<span>' + t('aiAgent') + '</span>'
     + '</button>'
     + '<button class="sidebar-dash-btn" id="syncBtn" onclick="openSync()" style="margin-top:4px;">'
     + '<span class="dash-icon">🔄</span>'
-    + '<span>Sincronización</span>'
+    + '<span>' + t('synchronization') + '</span>'
     + '</button></div>';
 
-  html += '<div class="sidebar-hdr">Acciones</div>';
+  html += '<div class="sidebar-hdr">' + t('actionsHeader') + '</div>';
   Object.entries(cats).forEach(([cat, items]) => {
-    html += '<div class="cat-block"><div class="cat-lbl">' + cat + '</div>';
+    html += '<div class="cat-block"><div class="cat-lbl">' + tCategory(cat) + '</div>';
     items.forEach(a => {
       html += '<div class="action-item" id="item_' + a.id + '" onclick="pickAction(\'' + a.id + '\')">'
-            + '<span class="action-name">' + a.label + '</span>'
+            + '<span class="action-name">' + (tAction(a.id) || a.label) + '</span>'
             + '<span class="badge badge-' + a.type + '">' + a.type + '</span>'
             + '</div>';
     });
@@ -1315,7 +1860,7 @@ function renderContent(id) {
     // Banner
     + '<div class="action-banner">'
     +   '<div class="action-top">'
-    +     '<span class="action-title">' + c.label + '</span>'
+    +     '<span class="action-title">' + (tAction(id) || c.label) + '</span>'
     +     '<span class="badge badge-card badge-' + c.type + '">' + c.type + '</span>'
     +   '</div>'
     +   '<div class="action-meta">'
@@ -1329,9 +1874,9 @@ function renderContent(id) {
 
     // Left: column ref
     +   '<div class="card">'
-    +     '<div class="card-head"><div class="card-head-icon blue">≡</div><span class="card-title">Referencia de columnas</span></div>'
+    +     '<div class="card-head"><div class="card-head-icon blue">≡</div><span class="card-title">' + t('columnReference') + '</span></div>'
     +     '<div class="card-body" style="padding:0;">'
-    +       '<table class="col-tbl"><thead><tr><th>Campo</th><th>Descripción</th><th>Req.</th></tr></thead>'
+    +       '<table class="col-tbl"><thead><tr><th>' + t('fieldCol') + '</th><th>' + t('descriptionCol') + '</th><th>' + t('reqCol') + '</th></tr></thead>'
     +       '<tbody>' + colRows + '</tbody></table>'
     +     '</div>'
     +   '</div>'
@@ -1339,37 +1884,37 @@ function renderContent(id) {
     // Right: execute
     +   '<div>'
     +     '<div class="card" style="margin-bottom:14px;">'
-    +       '<div class="card-head"><div class="card-head-icon green">◉</div><span class="card-title">Estado de conexión</span></div>'
+    +       '<div class="card-head"><div class="card-head-icon green">◉</div><span class="card-title">' + t('connectionStatus') + '</span></div>'
     +       '<div class="card-body"><div id="credCheck"></div></div>'
     +     '</div>'
     +     '<div class="card" style="margin-bottom:14px;">'
-    +       '<div class="card-head"><div class="card-head-icon red">⬇</div><span class="card-title">Plantilla CSV</span></div>'
+    +       '<div class="card-head"><div class="card-head-icon red">⬇</div><span class="card-title">' + t('csvTemplate') + '</span></div>'
     +       '<div class="card-body">'
-    +         '<p style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">Descarga la plantilla, rellena cada fila con los datos (una fila = un registro) y sube el archivo.</p>'
+    +         '<p style="font-size:12px;color:var(--t2);margin-bottom:14px;line-height:1.6;">' + t('csvTemplateHint') + '</p>'
     +         '<button class="btn btn-dl" onclick="dlTemplate(\'' + id + '\')">'
     +           '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 15V3M6 9l6 6 6-6M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3"/></svg>'
-    +           'plantilla_' + id + '.csv'
+    +           'template_' + id + '.csv'
     +         '</button>'
     +       '</div>'
     +     '</div>'
     +     '<div class="card">'
-    +       '<div class="card-head"><div class="card-head-icon red">▶</div><span class="card-title">Subir y ejecutar</span></div>'
+    +       '<div class="card-head"><div class="card-head-icon red">▶</div><span class="card-title">' + t('uploadAndExecute') + '</span></div>'
     +       '<div class="card-body">'
     +         '<div class="upload-zone" id="upZone" onclick="document.getElementById(\'fi\').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="drop(event)">'
     +           '<input type="file" id="fi" accept=".csv" onchange="onFile(this)">'
     +           '<span class="up-icon">📂</span>'
-    +           '<div class="up-text"><strong>Haz clic</strong> o arrastra el CSV aquí</div>'
+    +           '<div class="up-text">' + t('clickOrDrag') + '</div>'
     +           '<div class="up-file" id="fname"></div>'
     +         '</div>'
     +         (DIFF_SUPPORTED[id]
               ? '<button class="btn btn-ghost" id="diffBtn" onclick="previewDiff()" disabled style="width:100%;justify-content:center;padding:11px;margin-bottom:8px;">'
               +   '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h4M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M9 12h6M9 8h3M9 16h3"/></svg>'
-              +   '🔍 Vista previa de cambios'
+              +   t('previewChanges')
               + '</button>'
               : '')
     +         '<button class="btn btn-run" id="runBtn" onclick="runBulk()" disabled>'
     +           '<svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>'
-    +           'EJECUTAR EN MASA'
+    +           t('executeInBulk')
     +         '</button>'
     +         '<div class="prog-wrap" id="progWrap" style="display:none;"><div class="prog-fill" id="progFill" style="width:0%"></div></div>'
     +       '</div>'
@@ -1388,9 +1933,9 @@ function updateCredCheck() {
   const el = document.getElementById('credCheck');
   if (!el) return;
   if (c.account && c.apikey) {
-    el.innerHTML = '<div class="cred-bar ok"><span class="dot"></span>Conectado como <strong style="color:var(--t1);margin:0 4px;">' + c.account + '</strong>· ' + (c.username || 'sin usuario') + '</div>';
+    el.innerHTML = '<div class="cred-bar ok"><span class="dot"></span>' + t('connectedAs') + ' <strong style="color:var(--t1);margin:0 4px;">' + c.account + '</strong>· ' + (c.username || t('noUser')) + '</div>';
   } else {
-    el.innerHTML = '<div class="cred-bar err"><span class="dot"></span>Sin credenciales — <a href="#" onclick="openModal()">Configurar ahora</a></div>';
+    el.innerHTML = '<div class="cred-bar err"><span class="dot"></span>' + t('noCredentials') + ' <a href="#" onclick="openModal()">' + t('configureNow') + '</a></div>';
   }
 }
 
@@ -1418,8 +1963,8 @@ function dlTemplate(id) { window.open('/api/template/' + id, '_blank'); }
 /* ── Run bulk ───────────────────────────────────────────────────────────── */
 async function runBulk() {
   const cfg = getConfig();
-  if (!cfg.account || !cfg.apikey) { toast('Configura las credenciales primero', 'err'); openModal(); return; }
-  if (!csvFile) { toast('Selecciona un archivo CSV', 'err'); return; }
+  if (!cfg.account || !cfg.apikey) { toast(t('configureFirst'), 'err'); openModal(); return; }
+  if (!csvFile) { toast(t('selectCsv'), 'err'); return; }
 
   const runBtn   = document.getElementById('runBtn');
   const progWrap = document.getElementById('progWrap');
@@ -1432,7 +1977,7 @@ async function runBulk() {
   // Take snapshot silently for supported UPDATE actions (rollback capability)
   lastSnapshot = null;
   if (DIFF_SUPPORTED[current]) {
-    runBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> GUARDANDO SNAPSHOT...';
+    runBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> ' + t('savingSnapshot');
     try {
       const snFd = new FormData();
       snFd.append('csvfile',  csvFile);
@@ -1447,7 +1992,7 @@ async function runBulk() {
     } catch (_) { /* snapshot failure is non-blocking */ }
   }
 
-  runBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> EJECUTANDO...';
+  runBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> ' + t('executing');
 
   let fk = 0;
   const fkTimer = setInterval(() => { fk = Math.min(fk + 3, 80); progFill.style.width = fk + '%'; }, 250);
@@ -1470,14 +2015,14 @@ async function runBulk() {
     } else {
       lastResults = data;
       renderResults(data);
-      toast(data.success + ' correctos · ' + data.errors + ' errores', data.errors === 0 ? 'ok' : 'err');
+      toast(data.success + ' ' + t('restoredOk') + ' · ' + data.errors + ' ' + t('restoredErr'), data.errors === 0 ? 'ok' : 'err');
     }
   } catch (e) {
     clearInterval(fkTimer);
-    toast('Error de conexión: ' + e.message, 'err');
+    toast('Error: ' + e.message, 'err');
   } finally {
     runBtn.disabled = false;
-    runBtn.innerHTML = '<svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> EJECUTAR EN MASA';
+    runBtn.innerHTML = '<svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> ' + t('executeInBulk');
     setTimeout(() => { progWrap.style.display = 'none'; }, 1500);
   }
 }
@@ -1493,31 +2038,31 @@ function renderResults(data) {
     const tds = keys.map(k => '<td>' + (r.data[k] || '') + '</td>').join('');
     const detail = r.success
       ? '<span style="color:var(--green);font-weight:700;">OK</span>'
-      : '<span class="err-txt">Error ' + (r.errorCode || '') + ': ' + (r.errorMsg || 'desconocido') + '</span>';
+      : '<span class="err-txt">Error ' + (r.errorCode || '') + ': ' + (r.errorMsg || t('unknownErr')) + '</span>';
     return '<tr class="' + (r.success ? 'row-ok' : 'row-err') + '"><td>' + r.row + '</td><td>' + (r.success ? '✅' : '❌') + '</td>' + tds + '<td>' + detail + '</td></tr>';
   }).join('');
 
   const dlErrBtn = errs.length
-    ? '<button class="btn btn-ghost btn-sm" onclick="dlCsv(\'errors\')"><svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 15V3M6 9l6 6 6-6M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3"/></svg> Exportar errores</button>'
+    ? '<button class="btn btn-ghost btn-sm" onclick="dlCsv(\'errors\')"><svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 15V3M6 9l6 6 6-6M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3"/></svg> ' + t('exportErrors') + '</button>'
     : '';
 
   sec.innerHTML =
     '<div class="res-banner">'
-    +   '<div class="res-title">Resultados de la ejecución</div>'
+    +   '<div class="res-title">' + t('executionResults') + '</div>'
     +   '<div class="res-summary">'
-    +     '<div class="stat c-total"><div class="stat-val">' + data.total + '</div><div class="stat-lbl">Total</div></div>'
-    +     '<div class="stat c-ok"><div class="stat-val">' + data.success + '</div><div class="stat-lbl">Correctos</div></div>'
-    +     '<div class="stat c-err"><div class="stat-val">' + data.errors + '</div><div class="stat-lbl">Errores</div></div>'
+    +     '<div class="stat c-total"><div class="stat-val">' + data.total + '</div><div class="stat-lbl">' + t('totalLbl') + '</div></div>'
+    +     '<div class="stat c-ok"><div class="stat-val">' + data.success + '</div><div class="stat-lbl">' + t('correctLbl') + '</div></div>'
+    +     '<div class="stat c-err"><div class="stat-val">' + data.errors + '</div><div class="stat-lbl">' + t('errorsLbl') + '</div></div>'
     +   '</div>'
     + '</div>'
     + '<div class="res-body">'
     +   '<div class="card" style="margin-top:20px;padding:0;overflow:hidden;">'
     +     '<div class="dl-row">'
     +       dlErrBtn
-    +       '<button class="btn btn-ghost btn-sm" onclick="dlCsv(\'all\')"><svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 15V3M6 9l6 6 6-6M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3"/></svg> Exportar todos</button>'
+    +       '<button class="btn btn-ghost btn-sm" onclick="dlCsv(\'all\')"><svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 15V3M6 9l6 6 6-6M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3"/></svg> ' + t('exportAll') + '</button>'
     +     '</div>'
     +     '<div class="res-tbl-wrap"><table class="res-tbl">'
-    +       '<thead><tr><th>#</th><th>Estado</th>' + thCols + '<th>Detalle</th></tr></thead>'
+    +       '<thead><tr><th>#</th><th>' + t('statusCol') + '</th>' + thCols + '<th>' + t('detailCol') + '</th></tr></thead>'
     +       '<tbody>' + rows + '</tbody>'
     +     '</table></div>'
     +   '</div>'
@@ -1525,13 +2070,13 @@ function renderResults(data) {
 
   // Show rollback banner if snapshot was taken
   if (lastSnapshot) {
-    const ts = new Date(lastSnapshot.takenAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const ts = new Date(lastSnapshot.takenAt).toLocaleTimeString(currentLang === 'en' ? 'en-GB' : 'es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     sec.innerHTML += '<div class="restore-banner">'
       + '<span style="font-size:18px;">💾</span>'
-      + '<div class="restore-info">Snapshot guardado a las <strong>' + ts + '</strong> · ' + lastSnapshot.snapshot.length + ' registros. Si algo salió mal, puedes restaurar el estado anterior.</div>'
+      + '<div class="restore-info">' + t('snapshotSavedAt') + ' <strong>' + ts + '</strong> · ' + lastSnapshot.snapshot.length + ' ' + t('recordsLbl') + '. ' + t('snapshotInfo') + '</div>'
       + '<div style="display:flex;gap:8px;">'
-      +   '<button class="btn btn-ghost btn-sm" onclick="downloadSnapshot()">⬇ Descargar snapshot</button>'
-      +   '<button class="btn btn-ghost btn-sm" style="border-color:var(--orange);color:var(--orange);" onclick="restoreSnapshot()">↩ Restaurar estado anterior</button>'
+      +   '<button class="btn btn-ghost btn-sm" onclick="downloadSnapshot()">' + t('downloadSnapshot') + '</button>'
+      +   '<button class="btn btn-ghost btn-sm" style="border-color:var(--orange);color:var(--orange);" onclick="restoreSnapshot()">' + t('restoreState') + '</button>'
       + '</div>'
       + '</div>';
   }
@@ -1550,12 +2095,12 @@ function downloadSnapshot() {
     download: 'snapshot_' + lastSnapshot.action + '_' + new Date().toISOString().slice(0,19).replace(/:/g,'-') + '.csv',
   });
   a.click(); URL.revokeObjectURL(a.href);
-  toast('Snapshot descargado', 'ok');
+  toast(t('snapshotDownloaded'), 'ok');
 }
 
 async function restoreSnapshot() {
   if (!lastSnapshot) return;
-  if (!confirm('¿Restaurar el estado anterior de ' + lastSnapshot.snapshot.length + ' registros? Esta acción es irreversible.')) return;
+  if (!confirm(t('restoreConfirmPart1') + ' ' + lastSnapshot.snapshot.length + ' ' + t('restoreConfirmPart2'))) return;
 
   const cfg = getConfig();
   const cols = lastSnapshot.columns;
@@ -1571,15 +2116,15 @@ async function restoreSnapshot() {
   fd.append('password', cfg.password || '');
   fd.append('apikey',   cfg.apikey);
 
-  toast('Restaurando...', 'ok');
+  toast(t('restoring'), 'ok');
   try {
     const resp = await fetch('/api/execute', { method: 'POST', body: fd });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
     lastSnapshot = null; // consumed
-    toast('✓ Restaurado: ' + data.success + ' correctos · ' + data.errors + ' errores', data.errors === 0 ? 'ok' : 'err');
+    toast('✓ ' + data.success + ' ' + t('restoredOk') + ' · ' + data.errors + ' ' + t('restoredErr'), data.errors === 0 ? 'ok' : 'err');
   } catch (e) {
-    toast('Error restaurando: ' + e.message, 'err');
+    toast('Error: ' + e.message, 'err');
   }
 }
 
@@ -1610,14 +2155,14 @@ function dlCsv(mode) {
 
 async function previewDiff() {
   const cfg = getConfig();
-  if (!cfg.account || !cfg.apikey) { toast('Configura las credenciales primero', 'err'); openModal(); return; }
-  if (!csvFile) { toast('Selecciona un archivo CSV', 'err'); return; }
+  if (!cfg.account || !cfg.apikey) { toast(t('configureFirst'), 'err'); openModal(); return; }
+  if (!csvFile) { toast(t('selectCsv'), 'err'); return; }
 
   const diffBtn = document.getElementById('diffBtn');
-  if (diffBtn) { diffBtn.disabled = true; diffBtn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> Consultando Webfleet...'; }
+  if (diffBtn) { diffBtn.disabled = true; diffBtn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> ' + t('consultingWebfleet'); }
 
   const sec = document.getElementById('resSection');
-  sec.innerHTML = '<div class="diff-banner" style="margin-top:20px;"><div class="spin-ring" style="width:22px;height:22px;flex-shrink:0;"></div><div class="diff-banner-info"><div class="diff-banner-title">Leyendo estado actual en Webfleet...</div><div style="font-size:12px;color:var(--t2);margin-top:4px;">Comparando con los valores del CSV</div></div></div>';
+  sec.innerHTML = '<div class="diff-banner" style="margin-top:20px;"><div class="spin-ring" style="width:22px;height:22px;flex-shrink:0;"></div><div class="diff-banner-info"><div class="diff-banner-title">' + t('readingWebfleet') + '</div><div style="font-size:12px;color:var(--t2);margin-top:4px;">' + t('comparingCsv') + '</div></div></div>';
 
   const fd = new FormData();
   fd.append('csvfile',  csvFile);
@@ -1631,8 +2176,8 @@ async function previewDiff() {
     const resp = await fetch('/api/diff', { method: 'POST', body: fd });
     const data = await resp.json();
 
-    if (data.error)      { sec.innerHTML = '<div class="diff-banner" style="margin-top:20px;border-left-color:var(--red);"><div class="diff-banner-icon">✗</div><div class="diff-banner-info"><div class="diff-banner-title" style="color:var(--red);">Error al leer datos actuales</div><div style="font-size:12px;color:var(--t2);margin-top:4px;">' + data.error + '</div></div></div>'; return; }
-    if (!data.supported) { sec.innerHTML = '<div class="diff-banner" style="margin-top:20px;"><div class="diff-banner-icon">ℹ</div><div class="diff-banner-info"><div class="diff-banner-title">Vista previa no disponible para esta acción</div></div></div>'; return; }
+    if (data.error)      { sec.innerHTML = '<div class="diff-banner" style="margin-top:20px;border-left-color:var(--red);"><div class="diff-banner-icon">✗</div><div class="diff-banner-info"><div class="diff-banner-title" style="color:var(--red);">' + t('errorReadingWebfleet') + '</div><div style="font-size:12px;color:var(--t2);margin-top:4px;">' + data.error + '</div></div></div>'; return; }
+    if (!data.supported) { sec.innerHTML = '<div class="diff-banner" style="margin-top:20px;"><div class="diff-banner-icon">ℹ</div><div class="diff-banner-info"><div class="diff-banner-title">' + t('previewNotAvailable') + '</div></div></div>'; return; }
 
     renderDiff(data);
   } catch (e) {
@@ -1640,7 +2185,7 @@ async function previewDiff() {
   } finally {
     if (diffBtn) {
       diffBtn.disabled = false;
-      diffBtn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h4M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M9 12h6M9 8h3M9 16h3"/></svg> 🔍 Vista previa de cambios';
+      diffBtn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 3H5a2 2 0 00-2 2v14a2 2 0 002 2h4M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M9 12h6M9 8h3M9 16h3"/></svg> ' + t('previewChanges');
     }
   }
 }
@@ -1654,7 +2199,7 @@ function renderDiff(data) {
 
   const rows = diff.map(r => {
     const changesHtml = r.changes.length === 0
-      ? '<span class="diff-no-changes">Sin cambios</span>'
+      ? '<span class="diff-no-changes">' + t('noChanges') + '</span>'
       : '<div class="diff-changes">'
         + r.changes.map(c =>
             '<div class="diff-field-row">'
@@ -1664,12 +2209,12 @@ function renderDiff(data) {
             + '<span class="diff-new">' + c.newVal + '</span>'
             + '</div>'
           ).join('')
-        + (r.unchangedCount > 0 ? '<div class="diff-unchanged">' + r.unchangedCount + ' campo(s) sin cambio</div>' : '')
+        + (r.unchangedCount > 0 ? '<div class="diff-unchanged">' + r.unchangedCount + ' ' + t('fieldsWithoutChange') + '</div>' : '')
         + '</div>';
 
     return '<tr>'
       + '<td><div class="diff-record-id">' + (r.id || '—') + '</div>'
-      + (!r.found ? '<div class="diff-not-found">⚠ No encontrado en Webfleet</div>' : '') + '</td>'
+      + (!r.found ? '<div class="diff-not-found">' + t('notFoundWarn') + '</div>' : '') + '</td>'
       + '<td>' + changesHtml + '</td>'
       + '</tr>';
   }).join('');
@@ -1681,13 +2226,13 @@ function renderDiff(data) {
     + '<div class="diff-banner">'
     +   '<div class="diff-banner-icon">🔍</div>'
     +   '<div class="diff-banner-info">'
-    +     '<div class="diff-banner-title">Vista previa de cambios — ' + ACTIONS[current].label + '</div>'
+    +     '<div class="diff-banner-title">' + t('changesPreviewTitle') + (tAction(current) || ACTIONS[current].label) + '</div>'
     +     '<div class="diff-stats">'
-    +       '<div class="diff-stat blue"><strong>' + diff.length + '</strong> registros en el CSV</div>'
-    +       '<div class="diff-stat ok"><strong>' + withChg.length + '</strong> con cambios reales</div>'
-    +       (noChg.length  ? '<div class="diff-stat"><strong>' + noChg.length + '</strong> sin cambios (se omitirán)</div>' : '')
-    +       (notFound.length ? '<div class="diff-stat warn"><strong>' + notFound.length + '</strong> no encontrados en Webfleet</div>' : '')
-    +       '<div class="diff-stat blue"><strong>' + data.totalChanges + '</strong> modificaciones en total</div>'
+    +       '<div class="diff-stat blue"><strong>' + diff.length + '</strong> ' + t('recordsInCsv') + '</div>'
+    +       '<div class="diff-stat ok"><strong>' + withChg.length + '</strong> ' + t('withRealChanges') + '</div>'
+    +       (noChg.length  ? '<div class="diff-stat"><strong>' + noChg.length + '</strong> ' + t('withoutChanges') + '</div>' : '')
+    +       (notFound.length ? '<div class="diff-stat warn"><strong>' + notFound.length + '</strong> ' + t('notFoundInWebfleet') + '</div>' : '')
+    +       '<div class="diff-stat blue"><strong>' + data.totalChanges + '</strong> ' + t('totalModifications') + '</div>'
     +     '</div>'
     +   '</div>'
     + '</div>'
@@ -1695,19 +2240,19 @@ function renderDiff(data) {
     // Table
     + '<div class="card" style="border-radius:12px 12px 0 0;overflow:hidden;border-bottom:none;">'
     +   '<div class="diff-tbl-wrap"><table class="diff-tbl">'
-    +     '<thead><tr><th>' + data.idField + '</th><th>Cambios detectados</th></tr></thead>'
+    +     '<thead><tr><th>' + data.idField + '</th><th>' + t('detectedChanges') + '</th></tr></thead>'
     +     '<tbody>' + rows + '</tbody>'
     +   '</table></div>'
     + '</div>'
 
     // Confirm bar
     + '<div class="diff-confirm-bar">'
-    +   '<div class="diff-confirm-info">Se aplicarán <strong style="color:var(--t1);">' + data.totalChanges + ' cambios</strong> sobre <strong style="color:var(--t1);">' + withChg.length + ' registros</strong>.'
-    +     (notFound.length ? ' <span style="color:var(--orange);">⚠ ' + notFound.length + ' registros no encontrados serán ignorados por Webfleet.</span>' : '')
+    +   '<div class="diff-confirm-info">' + t('changesWillBeApplied') + ' <strong style="color:var(--t1);">' + data.totalChanges + ' ' + t('changesWord') + '</strong> ' + t('overWord') + ' <strong style="color:var(--t1);">' + withChg.length + ' ' + t('recordsWord') + '</strong>.'
+    +     (notFound.length ? ' <span style="color:var(--orange);">⚠ ' + notFound.length + ' ' + t('recordsNotFoundIgnored') + '</span>' : '')
     +   '</div>'
     +   '<div style="display:flex;gap:8px;">'
-    +     '<button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'resSection\').innerHTML=\'\'">Cancelar</button>'
-    +     '<button class="btn btn-red" onclick="runBulk()">✓ Confirmar y ejecutar</button>'
+    +     '<button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'resSection\').innerHTML=\'\'">' + t('diffCancelBtn') + '</button>'
+    +     '<button class="btn btn-red" onclick="runBulk()">' + t('confirmAndExecute') + '</button>'
     +   '</div>'
     + '</div>'
 
@@ -1741,29 +2286,29 @@ function renderSyncPage() {
   document.getElementById('sync').innerHTML =
     '<div class="sync-page">'
     + '<div class="sync-header">'
-    +   '<div class="sync-title">Sincronización <em>con Fuente Externa</em></div>'
-    +   '<div class="sync-subtitle">Sube el fichero maestro de tu cliente (ERP, RRHH, Excel…) y el sistema detectará qué hay que insertar, actualizar o dejar como está en Webfleet.</div>'
+    +   '<div class="sync-title">' + t('syncPageTitle') + ' <em>' + t('syncPageEm') + '</em></div>'
+    +   '<div class="sync-subtitle">' + t('syncSubtitle') + '</div>'
     + '</div>'
 
     // Entity selector
     + '<div class="entity-selector" id="entitySelector">'
-    +   entityBtn('vehicle', '🚗', 'Vehículos',   'Solo actualización')
-    +   entityBtn('driver',  '👤', 'Conductores', 'Inserción + actualización')
-    +   entityBtn('address', '📍', 'Direcciones', 'Inserción + actualización')
+    +   entityBtn('vehicle', '🚗', t('vehiclesLbl'), t('updateOnly'))
+    +   entityBtn('driver',  '👤', t('driversLbl'),  t('insertUpdate'))
+    +   entityBtn('address', '📍', t('addressesLbl'), t('insertUpdate'))
     + '</div>'
 
     // Upload
     + '<div class="sync-upload-card">'
-    +   '<div class="agent-input-label">Fichero fuente (CSV o TXT)</div>'
+    +   '<div class="agent-input-label">' + t('sourceFileLbl') + '</div>'
     +   '<div class="agent-file-zone" style="margin-bottom:0;" onclick="document.getElementById(\'syncFileInput\').click()">'
     +     '<input type="file" id="syncFileInput" accept=".csv,.txt,.tsv" style="display:none" onchange="onSyncFile(this)">'
     +     '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
-    +     '<span>Subir fichero fuente de verdad</span>'
+    +     '<span>' + t('uploadSourceFile') + '</span>'
     +   '</div>'
     +   '<div id="syncFileName" class="agent-file-name"></div>'
     +   '<div class="agent-actions" style="margin-top:14px;">'
-    +     '<button class="btn btn-red" id="syncAnalyzeBtn" onclick="runSyncAnalyze()">🔄 Analizar diferencias</button>'
-    +     '<button class="btn btn-ghost" onclick="openSync()">Limpiar</button>'
+    +     '<button class="btn btn-red" id="syncAnalyzeBtn" onclick="runSyncAnalyze()">' + t('analyzeDifferences') + '</button>'
+    +     '<button class="btn btn-ghost" onclick="openSync()">' + t('clearLbl') + '</button>'
     +   '</div>'
     + '</div>'
 
@@ -1797,15 +2342,15 @@ function onSyncFile(inp) {
 
 async function runSyncAnalyze() {
   const cfg = getConfig();
-  if (!cfg.account || !cfg.apikey) { toast('Configura las credenciales de Webfleet', 'err'); openModal(); return; }
-  if (!syncFile) { toast('Sube el fichero fuente primero', 'err'); return; }
+  if (!cfg.account || !cfg.apikey) { toast(t('configureWebfleet'), 'err'); openModal(); return; }
+  if (!syncFile) { toast(t('uploadSourceFirst'), 'err'); return; }
 
   const btn = document.getElementById('syncAnalyzeBtn');
   btn.disabled = true;
-  btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> Comparando con Webfleet...';
+  btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> ' + t('consultingWebfleet');
 
   document.getElementById('syncPreview').innerHTML =
-    '<div class="dash-loading"><div class="spin-ring"></div><span>Leyendo estado actual en Webfleet y comparando…</span></div>';
+    '<div class="dash-loading"><div class="spin-ring"></div><span>' + t('comparingWebfleet') + '</span></div>';
 
   const fd = new FormData();
   fd.append('csvfile',  syncFile);
@@ -1827,7 +2372,7 @@ async function runSyncAnalyze() {
     toast('Error: ' + e.message, 'err');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '🔄 Analizar diferencias';
+    btn.innerHTML = t('analyzeDifferences');
   }
 }
 
@@ -1835,9 +2380,9 @@ function renderSyncPreview(data) {
   const { toInsert, toUpdate, toSkip, summary, insertAction, updateAction, idField } = data;
 
   let html = '<div class="sync-results-summary">'
-    + syncStatCard('🆕', toInsert.length, 'A insertar', insertAction ? 'Nuevos registros' : 'Sin acción de inserción', 's-insert', 'insert')
-    + syncStatCard('✏️', toUpdate.length, 'A actualizar', 'Registros con cambios', 's-update', 'update')
-    + syncStatCard('✓',  toSkip.length,   'Ya sincronizados', 'Sin cambios', 's-skip', 'skip')
+    + syncStatCard('🆕', toInsert.length, t('toInsertLbl'), insertAction ? t('newRecordsLbl') : t('noInsertAction'), 's-insert', 'insert')
+    + syncStatCard('✏️', toUpdate.length, t('toUpdateLbl'), t('recordsWithChanges'), 's-update', 'update')
+    + syncStatCard('✓',  toSkip.length,   t('alreadySynced'), t('noChangesSyncLbl'), 's-skip', 'skip')
     + '</div>';
 
   // INSERT section
@@ -1852,8 +2397,8 @@ function renderSyncPreview(data) {
 
     html += '<div class="sync-section" id="syncSec_insert">'
       + '<div class="sync-section-hdr">'
-      +   '<div class="sync-section-title"><span style="color:var(--green);">🆕</span> A insertar (' + toInsert.length + ' registros)' + (insertAction ? '' : ' <span style="color:var(--orange);font-size:10px;font-weight:600;">[sin acción de inserción disponible]</span>') + '</div>'
-      +   (insertAction ? '<button class="btn btn-ghost btn-sm" onclick="executeSyncBatch(\'insert\')">▶ Insertar nuevos</button>' : '')
+      +   '<div class="sync-section-title"><span style="color:var(--green);">🆕</span> ' + t('toInsertLbl') + ' (' + toInsert.length + ' ' + t('recordsLbl') + ')' + (insertAction ? '' : ' <span style="color:var(--orange);font-size:10px;font-weight:600;">' + t('noInsertActionAvail') + '</span>') + '</div>'
+      +   (insertAction ? '<button class="btn btn-ghost btn-sm" onclick="executeSyncBatch(\'insert\')">' + t('insertNewBtn') + '</button>' : '')
       + '</div>'
       + '<div class="sync-tbl-wrap"><table class="sync-tbl"><thead><tr><th>' + idField + '</th>' + thHtml + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '<div id="syncInsertResult"></div>'
@@ -1878,10 +2423,10 @@ function renderSyncPreview(data) {
 
     html += '<div class="sync-section" id="syncSec_update">'
       + '<div class="sync-section-hdr">'
-      +   '<div class="sync-section-title"><span style="color:var(--blue);">✏️</span> A actualizar (' + toUpdate.length + ' registros)</div>'
-      +   (updateAction ? '<button class="btn btn-ghost btn-sm" onclick="executeSyncBatch(\'update\')">▶ Actualizar modificados</button>' : '')
+      +   '<div class="sync-section-title"><span style="color:var(--blue);">✏️</span> ' + t('toUpdateLbl') + ' (' + toUpdate.length + ' ' + t('recordsLbl') + ')</div>'
+      +   (updateAction ? '<button class="btn btn-ghost btn-sm" onclick="executeSyncBatch(\'update\')">' + t('updateModifiedBtn') + '</button>' : '')
       + '</div>'
-      + '<div class="sync-tbl-wrap"><table class="sync-tbl"><thead><tr><th>' + idField + '</th><th>Cambios</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      + '<div class="sync-tbl-wrap"><table class="sync-tbl"><thead><tr><th>' + idField + '</th><th>' + t('detectedChanges') + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
       + '<div id="syncUpdateResult"></div>'
       + '</div>';
   }
@@ -1891,9 +2436,9 @@ function renderSyncPreview(data) {
   const canUpdate = toUpdate.length && updateAction;
   if (canInsert || canUpdate) {
     html += '<div class="sync-exec-bar">'
-      + '<div class="sync-exec-info">Total a procesar: <strong>' + (toInsert.length + toUpdate.length) + ' registros</strong> · Sin cambios: <strong>' + toSkip.length + '</strong></div>'
+      + '<div class="sync-exec-info">' + t('totalToProcess') + ' <strong>' + (toInsert.length + toUpdate.length) + ' ' + t('recordsLbl') + '</strong> · ' + t('noChangesCount') + ' <strong>' + toSkip.length + '</strong></div>'
       + '<div class="sync-exec-btns">'
-      + (canInsert && canUpdate ? '<button class="btn btn-red" onclick="executeSyncAll()">▶ Ejecutar todo</button>' : '')
+      + (canInsert && canUpdate ? '<button class="btn btn-red" onclick="executeSyncAll()">' + t('executeAllBtn') + '</button>' : '')
       + '</div>'
       + '</div>';
   }
@@ -1901,7 +2446,7 @@ function renderSyncPreview(data) {
   if (!toInsert.length && !toUpdate.length) {
     html += '<div class="agent-summary-banner" style="border-left-color:var(--green);">'
       + '<span class="agent-summary-icon">✓</span>'
-      + '<div class="agent-summary-text" style="color:var(--green);font-weight:700;">Todo está sincronizado. No hay diferencias entre el fichero y Webfleet.</div>'
+      + '<div class="agent-summary-text" style="color:var(--green);font-weight:700;">' + t('allSyncedMsg') + '</div>'
       + '</div>';
   }
 
@@ -1924,7 +2469,7 @@ function scrollToSyncSection(type) {
 async function executeSyncBatch(type) {
   if (!syncResults) return;
   const cfg = getConfig();
-  if (!cfg.account || !cfg.apikey) { toast('Configura las credenciales', 'err'); return; }
+  if (!cfg.account || !cfg.apikey) { toast(t('configureWebfleet'), 'err'); return; }
 
   const isInsert  = type === 'insert';
   const rows      = isInsert ? syncResults.toInsert : syncResults.toUpdate;
@@ -1954,7 +2499,7 @@ async function executeSyncBatch(type) {
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
     const color = data.errors === 0 ? 'var(--green)' : 'var(--orange)';
-    if (actualResultDiv) actualResultDiv.innerHTML = '<div style="padding:10px 16px;font-size:12px;color:' + color + ';font-weight:700;">✓ ' + data.success + ' correctos · ' + data.errors + ' errores</div>';
+    if (actualResultDiv) actualResultDiv.innerHTML = '<div style="padding:10px 16px;font-size:12px;color:' + color + ';font-weight:700;">✓ ' + data.success + ' ' + t('restoredOk') + ' · ' + data.errors + ' ' + t('restoredErr') + '</div>';
     toast(action + ': ' + data.success + ' OK · ' + data.errors + ' err', data.errors === 0 ? 'ok' : 'err');
   } catch (e) {
     if (actualResultDiv) actualResultDiv.innerHTML = '<div style="padding:10px 16px;font-size:12px;color:var(--red);">✗ ' + e.message + '</div>';
@@ -1991,25 +2536,25 @@ function renderAgentInput() {
   document.getElementById('agent').innerHTML =
     '<div class="agent-page">'
     + '<div class="agent-header">'
-    +   '<div class="agent-title">Agente <em>IA</em> de Operaciones</div>'
-    +   '<div class="agent-subtitle">Pega los datos del cliente en cualquier formato (CSV, tabla de Excel, texto libre…) o sube un fichero.<br>El agente detectará qué operación realizar, mapeará los campos y te pedirá confirmación antes de ejecutar.</div>'
+    +   '<div class="agent-title">' + t('agentPageTitle') + '</div>'
+    +   '<div class="agent-subtitle">' + t('agentSubtitle') + '</div>'
     + '</div>'
     + '<div class="agent-input-card">'
-    +   '<div class="agent-input-label">Datos del cliente</div>'
-    +   '<textarea id="agentTextarea" class="agent-textarea" placeholder="Pega aquí los datos... Ejemplos:\n\nNombre,Matrícula,Color,Velocidad máx\nFurgón Madrid,1234ABC,blanco,120\nCamión Norte,5678DEF,negro,90\n\nO texto libre:\nActualizar los vehículos: Furgón Madrid con matrícula 1234ABC color blanco límite 120"></textarea>'
-    +   '<div class="agent-or">o</div>'
+    +   '<div class="agent-input-label">' + t('clientDataLbl') + '</div>'
+    +   '<textarea id="agentTextarea" class="agent-textarea" placeholder="' + t('agentPlaceholder') + '"></textarea>'
+    +   '<div class="agent-or">' + t('orSeparator') + '</div>'
     +   '<div class="agent-file-zone" onclick="document.getElementById(\'agentFileInput\').click()">'
     +     '<input type="file" id="agentFileInput" accept=".csv,.txt,.tsv" style="display:none" onchange="onAgentFile(this)">'
     +     '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
-    +     '<span>Subir fichero (CSV, TXT, TSV)</span>'
+    +     '<span>' + t('uploadFileLbl') + '</span>'
     +   '</div>'
     +   '<div id="agentFileName" class="agent-file-name"></div>'
     +   '<div class="agent-actions">'
     +     '<button class="btn btn-red" id="interpretBtn" onclick="interpretData()">'
     +       '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg>'
-    +       'Interpretar con IA'
+    +       t('interpretWithAI')
     +     '</button>'
-    +     '<button class="btn btn-ghost" onclick="clearAgent()">Limpiar</button>'
+    +     '<button class="btn btn-ghost" onclick="clearAgent()">' + t('clearLbl') + '</button>'
     +   '</div>'
     + '</div>'
     + '<div id="agentPreview"></div>'
@@ -2029,7 +2574,7 @@ function clearAgent() {
 
 async function interpretData() {
   const cfg = getConfig();
-  if (!cfg.anthropic_key) { toast('Configura tu Anthropic API Key en Credenciales', 'err'); openModal(); return; }
+  if (!cfg.anthropic_key) { toast(t('configureAnthropicKey'), 'err'); openModal(); return; }
 
   let rawData = '';
   if (agentFile) {
@@ -2037,14 +2582,14 @@ async function interpretData() {
   } else {
     rawData = (document.getElementById('agentTextarea').value || '').trim();
   }
-  if (!rawData) { toast('Pega datos o sube un fichero', 'err'); return; }
+  if (!rawData) { toast(t('pasteOrUpload'), 'err'); return; }
 
   const btn = document.getElementById('interpretBtn');
   btn.disabled = true;
-  btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> Interpretando...';
+  btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".3"/><path d="M12 2a10 10 0 0110 10"/></svg> ' + t('interpretingLbl');
 
   document.getElementById('agentPreview').innerHTML =
-    '<div class="dash-loading"><div class="spin-ring"></div><span>El agente está analizando los datos...</span></div>';
+    '<div class="dash-loading"><div class="spin-ring"></div><span>' + t('analyzingData') + '</span></div>';
 
   try {
     const resp = await fetch('/api/agent-interpret', {
@@ -2062,7 +2607,7 @@ async function interpretData() {
     toast('Error: ' + e.message, 'err');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg> Interpretar con IA';
+    btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/></svg> ' + t('interpretWithAI');
   }
 }
 
@@ -2074,7 +2619,7 @@ function renderAgentPreview(result) {
     + '<span class="agent-summary-icon">🤖</span>'
     + '<div class="agent-summary-text">'
     + result.summary
-    + (errCount ? ' <strong style="color:var(--orange);">· ' + errCount + ' problema(s) detectado(s) — revisa antes de ejecutar.</strong>' : '')
+    + (errCount ? ' <strong style="color:var(--orange);">· ' + errCount + ' ' + t('problemsDetected') + '</strong>' : '')
     + '</div></div>';
 
   batches.forEach((batch, idx) => {
@@ -2084,8 +2629,8 @@ function renderAgentPreview(result) {
   if (batches.length > 1) {
     const totalRows = batches.reduce((s, b) => s + (b.rows || []).length, 0);
     html += '<div class="execute-all-bar">'
-      + '<div class="execute-all-info"><strong>' + totalRows + ' registros</strong> en ' + batches.length + ' operaciones listas para ejecutar</div>'
-      + '<button class="btn btn-red" onclick="executeAllBatches()">▶ EJECUTAR TODO</button>'
+      + '<div class="execute-all-info"><strong>' + totalRows + ' ' + t('recordsInOps') + ' ' + batches.length + ' ' + t('opsReadyText') + '</strong></div>'
+      + '<button class="btn btn-red" onclick="executeAllBatches()">' + t('executeAllText') + '</button>'
       + '</div>';
   }
 
@@ -2125,7 +2670,7 @@ function renderBatchCard(batch, idx) {
     const hasErr  = rowIssues.some(i => i.type === 'error');
     const hasWarn = rowIssues.some(i => i.type === 'warning');
     const statusCls = hasErr ? 'row-status-err' : hasWarn ? 'row-status-warn' : 'row-status-ok';
-    const statusTxt = hasErr ? '✗ Error' : hasWarn ? '⚠ Aviso' : '✓ OK';
+    const statusTxt = hasErr ? '✗ Error' : hasWarn ? '⚠ ' + (currentLang === 'en' ? 'Warning' : 'Aviso') : '✓ OK';
 
     const tdCols = cols.map(c => {
       const val = r.mapped[c] !== undefined ? r.mapped[c] : '';
@@ -2150,10 +2695,10 @@ function renderBatchCard(batch, idx) {
     +   '<tbody>' + rowsHtml + '</tbody>'
     + '</table></div>'
     + '<div class="batch-footer">'
-    +   '<span class="batch-count">' + rows.length + ' registros · acción: <strong>' + batch.action + '</strong></span>'
+    +   '<span class="batch-count">' + rows.length + ' ' + t('recordsLbl') + ' · ' + t('actionLbl') + ': <strong>' + batch.action + '</strong></span>'
     +   (hasErrors
-        ? '<span style="color:var(--orange);font-size:12px;">⚠ Revisa los errores antes de ejecutar</span>'
-        : '<button class="btn btn-red btn-sm" onclick="executeBatch(' + idx + ')">▶ Ejecutar este batch</button>')
+        ? '<span style="color:var(--orange);font-size:12px;">' + t('reviewBeforeExecute') + '</span>'
+        : '<button class="btn btn-red btn-sm" onclick="executeBatch(' + idx + ')">' + t('executeThisBatch') + '</button>')
     + '</div>'
     + '<div id="batchResult_' + idx + '"></div>'
     + '</div>';
@@ -2161,12 +2706,12 @@ function renderBatchCard(batch, idx) {
 
 async function executeBatch(idx) {
   const cfg   = getConfig();
-  if (!cfg.account || !cfg.apikey) { toast('Configura las credenciales de Webfleet', 'err'); openModal(); return; }
+  if (!cfg.account || !cfg.apikey) { toast(t('configureWebfleet'), 'err'); openModal(); return; }
   const batch = agentBatches.batches[idx];
 
   // Build CSV from mapped rows
   const cols = Object.keys((batch.rows[0] || {}).mapped || {});
-  if (!cols.length) { toast('Sin datos que ejecutar', 'err'); return; }
+  if (!cols.length) { toast(t('noDataToExec'), 'err'); return; }
 
   const csvContent = '\uFEFF' + cols.join(',') + '\n'
     + batch.rows.map(r => cols.map(c => '"' + String(r.mapped[c] !== undefined ? r.mapped[c] : '').replace(/"/g, '""') + '"').join(',')).join('\n');
@@ -2181,7 +2726,7 @@ async function executeBatch(idx) {
   fd.append('apikey',   cfg.apikey);
 
   const resultDiv = document.getElementById('batchResult_' + idx);
-  resultDiv.innerHTML = '<div class="batch-exec-result"><div class="dash-loading" style="height:50px;"><div class="spin-ring" style="width:20px;height:20px;"></div><span>Ejecutando...</span></div></div>';
+  resultDiv.innerHTML = '<div class="batch-exec-result"><div class="dash-loading" style="height:50px;"><div class="spin-ring" style="width:20px;height:20px;"></div><span>' + t('executing2') + '</span></div></div>';
 
   // Disable button
   const card = document.getElementById('batchCard_' + idx);
@@ -2194,7 +2739,7 @@ async function executeBatch(idx) {
 
     const color = data.errors === 0 ? 'var(--green)' : 'var(--orange)';
     resultDiv.innerHTML = '<div class="batch-exec-result" style="background:var(--s2);">'
-      + '<span style="color:' + color + ';font-weight:700;">✓ Ejecutado: ' + data.success + ' correctos · ' + data.errors + ' errores</span>'
+      + '<span style="color:' + color + ';font-weight:700;">✓ ' + data.success + ' ' + t('restoredOk') + ' · ' + data.errors + ' ' + t('restoredErr') + '</span>'
       + '</div>';
     toast(batch.label + ': ' + data.success + ' OK · ' + data.errors + ' err', data.errors === 0 ? 'ok' : 'err');
   } catch (e) {
@@ -2243,16 +2788,16 @@ async function loadFleetData() {
 
   if (!cfg.account || !cfg.apikey) {
     panel.innerHTML = '<div class="dash-page"><div class="dash-error">'
-      + '<strong>Sin credenciales</strong>'
-      + '<p>Configura tu cuenta y API Key de Webfleet para ver el dashboard.</p>'
-      + '<button class="btn btn-red" onclick="openModal()" style="margin-top:8px;">Configurar credenciales</button>'
+      + '<strong>' + t('noCredentialsDash') + '</strong>'
+      + '<p>' + t('configureForDash') + '</p>'
+      + '<button class="btn btn-red" onclick="openModal()" style="margin-top:8px;">' + t('configureCredentials') + '</button>'
       + '</div></div>';
     return;
   }
 
   panel.innerHTML = '<div class="dash-page"><div class="dash-loading">'
     + '<div class="spin-ring"></div>'
-    + '<span>Cargando datos de flota...</span>'
+    + '<span>' + t('loadingFleetData') + '</span>'
     + '</div></div>';
 
   try {
@@ -2267,9 +2812,9 @@ async function loadFleetData() {
     renderDashboard(data);
   } catch (e) {
     panel.innerHTML = '<div class="dash-page"><div class="dash-error">'
-      + '<strong>Error al cargar datos</strong>'
+      + '<strong>' + t('errorLoadingData') + '</strong>'
       + '<p>' + e.message + '</p>'
-      + '<button class="btn btn-ghost" onclick="loadFleetData()" style="margin-top:8px;">Reintentar</button>'
+      + '<button class="btn btn-ghost" onclick="loadFleetData()" style="margin-top:8px;">' + t('retryBtn') + '</button>'
       + '</div></div>';
   }
 }
@@ -2277,7 +2822,7 @@ async function loadFleetData() {
 function renderDashboard(data) {
   const objs = data.objects  || [];
   const vehs = data.vehicles || [];
-  const now  = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const now  = new Date().toLocaleTimeString(currentLang === 'en' ? 'en-GB' : 'es-ES', { hour: '2-digit', minute: '2-digit' });
 
   // KPIs — generales
   const total    = objs.length;
@@ -2302,9 +2847,10 @@ function renderDashboard(data) {
   }).length;
   // pos_speed in Webfleet is in 1/100 km/h
   const maxSpeedKmh = Math.round(maxSpeed / 100);
+  const numLocale = currentLang === 'en' ? 'en-GB' : 'es-ES';
   const totalKmFormatted = totalKm > 0
-    ? (Math.round(totalKm / 1000)).toLocaleString('es-ES')
-    : (vehs.reduce((s, v) => s + (parseFloat(v.mileage || 0)), 0) / 1000).toLocaleString('es-ES');
+    ? (Math.round(totalKm / 1000)).toLocaleString(numLocale)
+    : (vehs.reduce((s, v) => s + (parseFloat(v.mileage || 0)), 0) / 1000).toLocaleString(numLocale);
 
   const cfg = getConfig();
   const hasAI = !!cfg.anthropic_key;
@@ -2316,55 +2862,55 @@ function renderDashboard(data) {
     // Header
     + '<div class="dash-header">'
     +   '<div>'
-    +     '<div class="dash-title">Dashboard de <em>Flota</em></div>'
-    +     '<div class="dash-meta">Actualizado a las ' + now + ' · ' + total + ' vehículos</div>'
+    +     '<div class="dash-title">' + t('dashTitle') + '</div>'
+    +     '<div class="dash-meta">' + t('updatedAt') + ' ' + now + ' · ' + total + ' ' + t('vehiclesCount') + '</div>'
     +   '</div>'
     +   '<div class="dash-actions">'
-    +     '<button class="btn btn-ghost btn-sm" onclick="loadFleetData()">↺ Actualizar</button>'
+    +     '<button class="btn btn-ghost btn-sm" onclick="loadFleetData()">' + t('refreshBtn') + '</button>'
     +     (hasAI
-        ? '<button class="btn btn-red btn-sm" id="insightBtn" onclick="generateInsights()">✦ Analizar con IA</button>'
-        : '<button class="btn btn-ghost btn-sm" onclick="openModal()" title="Configura tu Anthropic API Key para usar esta función">✦ IA (sin clave)</button>')
+        ? '<button class="btn btn-red btn-sm" id="insightBtn" onclick="generateInsights()">' + t('analyzeWithAI') + '</button>'
+        : '<button class="btn btn-ghost btn-sm" onclick="openModal()" title="' + t('configureAnthropicKey') + '">' + t('aiNoKey') + '</button>')
     +   '</div>'
     + '</div>'
 
     // KPI cards — flota general
     + '<div class="kpi-grid">'
-    +   kpiCard('🚗', total.toString(), 'Total Vehículos', '', 'kpi-blue')
-    +   kpiCard('▶', moving.toString(), 'En Movimiento', (total ? Math.round(moving/total*100) : 0) + '% de la flota', 'kpi-green')
-    +   kpiCard('⚡', (total - moving).toString(), 'Detenidos', '', 'kpi-orng')
-    +   kpiCard('📍', maxSpeedKmh + ' km/h', 'Vel. Máx. Actual', 'velocidad punta en flota', 'kpi-red')
+    +   kpiCard('🚗', total.toString(), t('totalVehicles'), '', 'kpi-blue')
+    +   kpiCard('▶', moving.toString(), t('movingLbl'), (total ? Math.round(moving/total*100) : 0) + t('ofFleet'), 'kpi-green')
+    +   kpiCard('⚡', (total - moving).toString(), t('stoppedLbl'), '', 'kpi-orng')
+    +   kpiCard('📍', maxSpeedKmh + ' km/h', t('maxSpeedCurrent'), t('topFleetSpeed'), 'kpi-red')
     + '</div>'
 
     // KPI cards — combustible
-    + '<div class="kpi-section-label">Combustible</div>'
+    + '<div class="kpi-section-label">' + t('fuelSection') + '</div>'
     + '<div class="kpi-grid kpi-grid-fuel">'
-    +   kpiCard('⛽', withFuelUsage.toString(), 'Reportan Consumo', (total ? Math.round(withFuelUsage/total*100) : 0) + '% de la flota · vh_avgfuelusage > 0', 'kpi-orng')
-    +   kpiCard('🪣', withFuelLevel.toString(), 'Reportan Nivel', (total ? Math.round(withFuelLevel/total*100) : 0) + '% de la flota · vh_fuellevel ≥ 0', 'kpi-green')
+    +   kpiCard('⛽', withFuelUsage.toString(), t('reportConsumption'), (total ? Math.round(withFuelUsage/total*100) : 0) + t('ofFleet') + ' · vh_avgfuelusage > 0', 'kpi-orng')
+    +   kpiCard('🪣', withFuelLevel.toString(), t('reportLevel'), (total ? Math.round(withFuelLevel/total*100) : 0) + t('ofFleet') + ' · vh_fuellevel ≥ 0', 'kpi-green')
     + '</div>'
 
     // Charts row 1
     + '<div class="charts-grid">'
-    +   '<div class="chart-card"><div class="chart-title">Top 10 Vehículos por Kilometraje</div><div class="chart-wrap"><canvas id="chartKm"></canvas></div></div>'
-    +   '<div class="chart-card"><div class="chart-title">Estado de Actividad</div><div class="chart-wrap"><canvas id="chartActivity"></canvas></div></div>'
+    +   '<div class="chart-card"><div class="chart-title">' + t('top10ByMileage') + '</div><div class="chart-wrap"><canvas id="chartKm"></canvas></div></div>'
+    +   '<div class="chart-card"><div class="chart-title">' + t('activityStatus') + '</div><div class="chart-wrap"><canvas id="chartActivity"></canvas></div></div>'
     + '</div>'
 
     // Charts row 2
     + '<div class="charts-grid-bottom">'
-    +   '<div class="chart-card"><div class="chart-title">Tipo de Vehículo</div><div class="chart-wrap"><canvas id="chartType"></canvas></div></div>'
-    +   '<div class="chart-card"><div class="chart-title">Distribución de Velocidades Actuales</div><div class="chart-wrap"><canvas id="chartSpeed"></canvas></div></div>'
+    +   '<div class="chart-card"><div class="chart-title">' + t('vehicleType') + '</div><div class="chart-wrap"><canvas id="chartType"></canvas></div></div>'
+    +   '<div class="chart-card"><div class="chart-title">' + t('speedDistribution') + '</div><div class="chart-wrap"><canvas id="chartSpeed"></canvas></div></div>'
     + '</div>'
 
     // AI Insights
     + '<div class="insights-card">'
     +   '<div class="insights-hdr">'
-    +     '<div class="insights-title"><span class="ai-badge">AI</span> Análisis de Flota — Experto Senior</div>'
+    +     '<div class="insights-title"><span class="ai-badge">AI</span> ' + t('aiFleetAnalysis') + '</div>'
     +   '</div>'
     +   '<div class="insights-body" id="insightsBody">'
     +     '<div class="insights-placeholder">'
     +       '<svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>'
     +       (hasAI
-           ? '<p>Pulsa <strong>Analizar con IA</strong> para obtener insights de un analista senior de gestión de flotas.</p>'
-           : '<p>Configura tu <strong>Anthropic API Key</strong> en Credenciales para activar el análisis con IA.</p>')
+           ? '<p>' + t('pressAnalyzeAI') + '</p>'
+           : '<p>' + t('configAnthropicDash') + '</p>')
     +     '</div>'
     +   '</div>'
     + '</div>'
@@ -2432,7 +2978,7 @@ function buildKmChart(vehs) {
       indexAxis: 'y',
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.x.toLocaleString('es-ES') + ' km' } },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.x.toLocaleString(currentLang === 'en' ? 'en-GB' : 'es-ES') + ' km' } },
       },
       scales: {
         x: { grid: { color: CHART_DEFAULTS.gridColor }, ticks: { color: CHART_DEFAULTS.textColor, font: CHART_DEFAULTS.font } },
@@ -2446,7 +2992,7 @@ function buildActivityChart(moving, stopped) {
   dashCharts.activity = new Chart(document.getElementById('chartActivity'), {
     type: 'doughnut',
     data: {
-      labels: ['En movimiento', 'Detenidos'],
+      labels: [t('movingChart'), t('stoppedChart')],
       datasets: [{
         data: [moving, stopped],
         backgroundColor: [CHART_DEFAULTS.color.green, CHART_DEFAULTS.color.orange],
@@ -2461,7 +3007,7 @@ function buildActivityChart(moving, stopped) {
           display: true, position: 'bottom',
           labels: { color: CHART_DEFAULTS.textColor, font: CHART_DEFAULTS.font, padding: 16, boxWidth: 10, boxHeight: 10 },
         },
-        tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed + ' vehículos' } },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed + ' ' + t('vehiclesCount') } },
       },
     }),
   });
@@ -2470,13 +3016,13 @@ function buildActivityChart(moving, stopped) {
 function buildTypeChart(objs) {
   const types = {};
   objs.forEach(o => {
-    const t = o.vehicletype !== undefined ? ('Tipo ' + o.vehicletype) : 'Desconocido';
-    types[t] = (types[t] || 0) + 1;
+    const typeKey = o.vehicletype !== undefined ? ('Type ' + o.vehicletype) : '__unknown__';
+    types[typeKey] = (types[typeKey] || 0) + 1;
   });
   if (!Object.keys(types).length) return;
 
   const palette = [CHART_DEFAULTS.color.primary, CHART_DEFAULTS.color.blue, CHART_DEFAULTS.color.orange, CHART_DEFAULTS.color.purple, CHART_DEFAULTS.color.green, '#f472b6', '#34d399'];
-  const labels = Object.keys(types);
+  const labels = Object.keys(types).map(k => k === '__unknown__' ? t('unknownType') : (currentLang === 'en' ? k : k.replace('Type ', 'Tipo ')));
   const values = Object.values(types);
 
   dashCharts.type = new Chart(document.getElementById('chartType'), {
@@ -2496,7 +3042,7 @@ function buildTypeChart(objs) {
           display: true, position: 'bottom',
           labels: { color: CHART_DEFAULTS.textColor, font: CHART_DEFAULTS.font, padding: 12, boxWidth: 10, boxHeight: 10 },
         },
-        tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed + ' uds.' } },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed + (currentLang === 'en' ? ' units' : ' uds.') } },
       },
     }),
   });
@@ -2504,13 +3050,14 @@ function buildTypeChart(objs) {
 
 function buildSpeedChart(objs) {
   // pos_speed in 1/100 km/h
-  const buckets = { 'Detenido (0)': 0, '1-60 km/h': 0, '61-100 km/h': 0, '>100 km/h': 0 };
+  const b0 = t('stoppedSpeed'), b1 = '1-60 km/h', b2 = '61-100 km/h', b3 = '>100 km/h';
+  const buckets = { [b0]: 0, [b1]: 0, [b2]: 0, [b3]: 0 };
   objs.forEach(o => {
     const s = (o.pos_speed || 0) / 100; // convert to km/h
-    if      (s === 0)   buckets['Detenido (0)']++;
-    else if (s <= 60)   buckets['1-60 km/h']++;
-    else if (s <= 100)  buckets['61-100 km/h']++;
-    else                buckets['>100 km/h']++;
+    if      (s === 0)   buckets[b0]++;
+    else if (s <= 60)   buckets[b1]++;
+    else if (s <= 100)  buckets[b2]++;
+    else                buckets[b3]++;
   });
 
   const bgColors = [CHART_DEFAULTS.color.orange, CHART_DEFAULTS.color.green, CHART_DEFAULTS.color.blue, CHART_DEFAULTS.color.primary];
@@ -2528,7 +3075,7 @@ function buildSpeedChart(objs) {
     options: chartBase({
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' vehículos' } },
+        tooltip: { callbacks: { label: ctx => ' ' + ctx.parsed.y + ' ' + t('vehiclesCount') } },
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: CHART_DEFAULTS.textColor, font: CHART_DEFAULTS.font } },
@@ -2541,14 +3088,14 @@ function buildSpeedChart(objs) {
 /* ── AI Insights ────────────────────────────────────────────────────────── */
 async function generateInsights() {
   const cfg = getConfig();
-  if (!cfg.anthropic_key) { toast('Configura tu Anthropic API Key en Credenciales', 'err'); openModal(); return; }
-  if (!dashData) { toast('Carga los datos primero', 'err'); return; }
+  if (!cfg.anthropic_key) { toast(t('configureAnthropicKey'), 'err'); openModal(); return; }
+  if (!dashData) { toast(t('loadDataFirst'), 'err'); return; }
 
   const body = document.getElementById('insightsBody');
   const btn  = document.getElementById('insightBtn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Analizando...'; }
+  if (btn) { btn.disabled = true; btn.textContent = t('analyzingLbl'); }
 
-  body.innerHTML = '<div class="dash-loading" style="height:100px;"><div class="spin-ring"></div><span style="font-size:12px;">El analista está procesando tu flota...</span></div>';
+  body.innerHTML = '<div class="dash-loading" style="height:100px;"><div class="spin-ring"></div><span style="font-size:12px;">' + t('analystProcessing') + '</span></div>';
 
   try {
     const resp = await fetch('/api/fleet-insights', {
@@ -2565,7 +3112,7 @@ async function generateInsights() {
     body.innerHTML = '<div style="color:var(--red);font-size:12px;">Error: ' + e.message + '</div>';
     toast('Error generando insights: ' + e.message, 'err');
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '✦ Analizar con IA'; }
+    if (btn) { btn.disabled = false; btn.textContent = t('analyzeWithAI'); }
   }
 }
 
