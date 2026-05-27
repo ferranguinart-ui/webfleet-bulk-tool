@@ -16,6 +16,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const BASE = 'https://csv.webfleet.com/extern';
 
+/* Build axios BasicAuth config for Webfleet (per official migration guide).
+   Only username+password go in the Authorization: Basic header.
+   account and apikey stay as URL query params. */
+function wfAuth(username, password) {
+  return { username, password };
+}
+
 /* ─── ACTION DEFINITIONS ──────────────────────────────────────────────────── */
 const ACTIONS = {
 
@@ -365,20 +372,22 @@ app.post('/api/execute', upload.single('csvfile'), async (req, res) => {
   for (let i = 0; i < records.length; i++) {
     const row = records[i];
 
-    // Fixed credentials + action + row values (skip empty)
-    const params = { account, username, password, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action };
+    // username+password go in BasicAuth header; account+apikey stay as URL params
+    const params = { account, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action };
     for (const [k, v] of Object.entries(row)) {
       if (v !== '' && v != null) params[k] = v;
     }
+    const auth = wfAuth(username, password);
 
     try {
       let resp;
       if (cfg.httpMethod === 'POST') {
         resp = await axios.post(BASE, new URLSearchParams(params).toString(), {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+          auth,
         });
       } else {
-        resp = await axios.get(BASE, { params });
+        resp = await axios.get(BASE, { params, auth });
       }
 
       // Webfleet signals errors via response headers
@@ -430,9 +439,10 @@ app.post('/api/snapshot', upload.single('csvfile'), async (req, res) => {
   const csvIds  = new Set(csvRows.map(r => String(r[map.idField] || '').trim()).filter(Boolean));
   const csvCols = csvRows[0] ? Object.keys(csvRows[0]) : [];
 
-  const params = { account, username, password, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action: map.readAction };
+  const params = { account, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action: map.readAction };
+  const auth   = wfAuth(username, password);
   try {
-    const resp     = await axios.get(BASE, { params });
+    const resp     = await axios.get(BASE, { params, auth });
     const errCode  = resp.headers['x-webfleet-errorcode'];
     if (errCode && parseInt(errCode) !== 0) throw new Error('Error ' + errCode + ': ' + decodeURIComponent(resp.headers['x-webfleet-errormessage'] || ''));
     const allRecords = Array.isArray(resp.data) ? resp.data : [];
@@ -492,10 +502,11 @@ app.post('/api/sync-analyze', upload.single('csvfile'), async (req, res) => {
     return res.status(400).json({ error: 'CSV inválido: ' + e.message });
   }
 
-  const params = { account, username, password, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action: cfg.readAction };
+  const params = { account, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action: cfg.readAction };
+  const auth   = wfAuth(username, password);
   let currentRecords;
   try {
-    const resp    = await axios.get(BASE, { params });
+    const resp    = await axios.get(BASE, { params, auth });
     const errCode = resp.headers['x-webfleet-errorcode'];
     if (errCode && parseInt(errCode) !== 0) throw new Error('Error ' + errCode + ': ' + decodeURIComponent(resp.headers['x-webfleet-errormessage'] || ''));
     currentRecords = Array.isArray(resp.data) ? resp.data : [];
@@ -565,10 +576,11 @@ app.post('/api/diff', upload.single('csvfile'), async (req, res) => {
   }
 
   // Fetch ALL current records from Webfleet
-  const params = { account, username, password, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action: map.readAction };
+  const params = { account, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action: map.readAction };
+  const auth   = wfAuth(username, password);
   let currentRecords;
   try {
-    const resp = await axios.get(BASE, { params });
+    const resp = await axios.get(BASE, { params, auth });
     const errCode = resp.headers['x-webfleet-errorcode'];
     if (errCode && parseInt(errCode) !== 0) {
       throw new Error('Error ' + errCode + ': ' + decodeURIComponent(resp.headers['x-webfleet-errormessage'] || ''));
@@ -695,7 +707,8 @@ app.post('/api/fleet-report', async (req, res) => {
   const { account, username, password, apikey } = req.body;
   if (!account || !apikey) return res.status(400).json({ error: 'Faltan credenciales (account / apikey)' });
 
-  const base = { account, username, password, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es' };
+  const base = { account, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es' };
+  const auth = wfAuth(username, password);
 
   const checkErr = (r) => {
     const code = r.headers['x-webfleet-errorcode'];
@@ -707,8 +720,8 @@ app.post('/api/fleet-report', async (req, res) => {
 
   try {
     const [objResp, vehResp] = await Promise.all([
-      axios.get(BASE, { params: { ...base, action: 'showObjectReportExtern' } }),
-      axios.get(BASE, { params: { ...base, action: 'showVehicleReportExtern' } }),
+      axios.get(BASE, { params: { ...base, action: 'showObjectReportExtern' }, auth }),
+      axios.get(BASE, { params: { ...base, action: 'showVehicleReportExtern' }, auth }),
     ]);
     res.json({ objects: checkErr(objResp), vehicles: checkErr(vehResp) });
   } catch (e) {
