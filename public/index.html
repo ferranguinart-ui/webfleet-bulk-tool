@@ -1096,6 +1096,16 @@
     }
     .cat-items.open { max-height: 400px; }
 
+    /* master Actions accordion wrapper */
+    .actions-wrapper {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height .35s ease;
+    }
+    .actions-wrapper.open { max-height: 2400px; }
+    /* chevron on the Actions nav button */
+    .sidebar-dash-btn.open .cat-chevron { transform: rotate(90deg); opacity: 1; }
+
     /* ══════════════════════════════════════════════════ LANG TOGGLE */
     .lang-toggle {
       display: flex; align-items: center; gap: 2px;
@@ -1747,6 +1757,7 @@ let current = null;
 let csvFile = null;
 let lastResults = null;
 let catExpanded = {};   // tracks which categories are open in the sidebar
+let actionsOpen = true; // tracks whether the Actions master accordion is open
 
 const DIFF_SUPPORTED = {
   updateVehicle: true,
@@ -1828,6 +1839,14 @@ function toggleCat(key) {
   if (items) items.classList.toggle('open', catExpanded[cat]);
 }
 
+function toggleActions() {
+  actionsOpen = !actionsOpen;
+  const btn     = document.getElementById('actionsBtn');
+  const wrapper = document.getElementById('actionsWrapper');
+  if (btn)     btn.classList.toggle('open',     actionsOpen);
+  if (wrapper) wrapper.classList.toggle('open', actionsOpen);
+}
+
 function renderSidebar() {
   const cats = {};
   Object.entries(ACTIONS).forEach(([id, c]) => {
@@ -1839,6 +1858,8 @@ function renderSidebar() {
   if (current && ACTIONS[current]) {
     catExpanded[ACTIONS[current].category] = true;
   }
+
+  const actOpen = actionsOpen;
 
   let html = '<div class="sidebar-dash">'
     + '<button class="sidebar-dash-btn" id="dashBtn" onclick="openDashboard()">'
@@ -1852,9 +1873,15 @@ function renderSidebar() {
     + '<button class="sidebar-dash-btn" id="syncBtn" onclick="openSync()" style="margin-top:4px;">'
     + '<span class="dash-icon">🔄</span>'
     + '<span>' + t('synchronization') + '</span>'
-    + '</button></div>';
+    + '</button>'
+    + '<button class="sidebar-dash-btn' + (actOpen ? ' open' : '') + '" id="actionsBtn" onclick="toggleActions()" style="margin-top:4px;">'
+    + '<span class="dash-icon">⚡</span>'
+    + '<span style="flex:1;">' + t('actionsHeader') + '</span>'
+    + '<svg class="cat-chevron" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>'
+    + '</button>'
+    + '</div>';
 
-  html += '<div class="sidebar-hdr">' + t('actionsHeader') + '</div>';
+  html += '<div id="actionsWrapper" class="actions-wrapper' + (actOpen ? ' open' : '') + '">';
 
   Object.entries(cats).forEach(([cat, items]) => {
     const key     = encodeURIComponent(cat);
@@ -1878,6 +1905,8 @@ function renderSidebar() {
     html += '</div></div>';
   });
 
+  html += '</div>'; // close actionsWrapper
+
   document.getElementById('sidebar').innerHTML = html;
 }
 
@@ -1887,7 +1916,12 @@ function pickAction(id) {
   document.querySelectorAll('.action-item').forEach(el => el.classList.remove('active'));
   document.getElementById('item_' + id).classList.add('active');
   ['dashBtn','agentBtn','syncBtn'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('active'); });
-  // Auto-expand the category of this action
+  // Auto-open the master Actions section and the specific category
+  actionsOpen = true;
+  const actBtn     = document.getElementById('actionsBtn');
+  const actWrapper = document.getElementById('actionsWrapper');
+  if (actBtn)     actBtn.classList.add('open');
+  if (actWrapper) actWrapper.classList.add('open');
   if (ACTIONS[id]) {
     const cat = ACTIONS[id].category;
     const key = encodeURIComponent(cat);
