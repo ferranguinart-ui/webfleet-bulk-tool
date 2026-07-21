@@ -2048,17 +2048,63 @@ function drop(e) {
   document.getElementById('upZone').classList.remove('drag-over');
   if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
 }
+let lastDiff = null; // stores the last diff result for filtered execution
+
 function setFile(f) {
-  csvFile = f;
+  csvFile  = f;
+  lastDiff = null;
   document.getElementById('fname').textContent = '✓ ' + f.name;
-  const btn = document.getElementById('runBtn');
-  if (btn) btn.disabled = false;
-  const diffBtn = document.getElementById('diffBtn');
-  if (diffBtn) diffBtn.disabled = false;
+
+  if (DIFF_SUPPORTED[current]) {
+    // For update actions: auto-run diff; keep run button locked until user confirms
+    const runBtn = document.getElementById('runBtn');
+    if (runBtn) { runBtn.disabled = true; runBtn.style.display = 'none'; }
+    const diffBtn = document.getElementById('diffBtn');
+    if (diffBtn) diffBtn.style.display = 'none'; // hide manual diff btn, auto-runs now
+    previewDiff();
+  } else {
+    const btn = document.getElementById('runBtn');
+    if (btn) { btn.disabled = false; btn.style.display = ''; }
+    const diffBtn = document.getElementById('diffBtn');
+    if (diffBtn) diffBtn.disabled = false;
+  }
 }
 
 /* ── Template download ──────────────────────────────────────────────────── */
 function dlTemplate(id) { window.open('/api/template/' + id, '_blank'); }
+
+/* ── Run bulk only changed rows (post-diff) ─────────────────────────────── */
+async function runBulkFiltered() {
+  if (!lastDiff || !csvFile) { runBulk(); return; }
+
+  // Parse CSV client-side, keep only rows with actual changes
+  const text = await csvFile.text();
+  const lines = text.replace(/^﻿/, '').split(/\r?\n/);
+  const header = lines[0];
+  const changedRowNums = new Set(
+    lastDiff.diff.filter(r => r.changes.length > 0).map(r => r.row) // r.row is 1-based data row
+  );
+
+  const filteredLines = [header];
+  lines.slice(1).forEach((line, i) => {
+    if (line.trim() && changedRowNums.has(i + 1)) filteredLines.push(line);
+  });
+
+  if (filteredLines.length <= 1) {
+    toast('No hay filas con cambios que ejecutar.', 'ok');
+    return;
+  }
+
+  const filteredBlob = new Blob([filteredLines.join('\n')], { type: 'text/csv' });
+  const filteredFile = new File([filteredBlob], csvFile.name, { type: 'text/csv' });
+
+  // Swap csvFile temporarily, run, restore
+  const original = csvFile;
+  csvFile = filteredFile;
+  lastDiff = null;
+  await runBulk();
+  csvFile = original;
+}
 
 /* ── Run bulk ───────────────────────────────────────────────────────────── */
 async function runBulk() {
@@ -2347,17 +2393,25 @@ function renderDiff(data) {
 
     // Confirm bar
     + '<div class="diff-confirm-bar">'
-    +   '<div class="diff-confirm-info">' + t('changesWillBeApplied') + ' <strong style="color:var(--t1);">' + data.totalChanges + ' ' + t('changesWord') + '</strong> ' + t('overWord') + ' <strong style="color:var(--t1);">' + withChg.length + ' ' + t('recordsWord') + '</strong>.'
-    +     (notFound.length ? ' <span style="color:var(--orange);">⚠ ' + notFound.length + ' ' + t('recordsNotFoundIgnored') + '</span>' : '')
+    +   '<div class="diff-confirm-info">'
+    +     (withChg.length === 0
+    ?  '✅ <strong style="color:var(--green);">Todo sincronizado</strong> — ninguna fila tiene cambios. No es necesario ejecutar.'
+    :  t('changesWillBeApplied') + ' <strong style="color:var(--t1);">' + data.totalChanges + ' ' + t('changesWord') + '</strong> ' + t('overWord') + ' <strong style="color:var(--t1);">' + withChg.length + ' ' + t('recordsWord') + '</strong>.'
+       + (noChg.length    ? ' <span style="color:var(--t3);">(' + noChg.length + ' sin cambios → se omitirán)</span>' : '')
+       + (notFound.length ? ' <span style="color:var(--orange);">⚠ ' + notFound.length + ' ' + t('recordsNotFoundIgnored') + '</span>' : '')
+    )
     +   '</div>'
     +   '<div style="display:flex;gap:8px;">'
-    +     '<button class="btn btn-ghost btn-sm" onclick="document.getElementById(\'resSection\').innerHTML=\'\'">' + t('diffCancelBtn') + '</button>'
-    +     '<button class="btn btn-red" onclick="runBulk()">' + t('confirmAndExecute') + '</button>'
+    +     '<button class="btn btn-ghost btn-sm" onclick="lastDiff=null;document.getElementById(\'resSection\').innerHTML=\'\';const rb=document.getElementById(\'runBtn\');if(rb){rb.style.display=\'\';rb.disabled=true;}">' + t('diffCancelBtn') + '</button>'
+    +     (withChg.length > 0
+    ?    '<button class="btn btn-red" onclick="runBulkFiltered()">' + t('confirmAndExecute') + ' (' + withChg.length + ')</button>'
+    :    '')
     +   '</div>'
     + '</div>'
 
     + '</div>';
 
+  lastDiff = data;
   sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
