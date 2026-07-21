@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 const express   = require('express');
 const multer    = require('multer');
@@ -598,13 +598,22 @@ app.post('/api/sync-analyze', upload.single('csvfile'), async (req, res) => {
 
 /* ─── DIFF / PREVIEW-CHANGES ROUTE ───────────────────────────────────────── */
 
-// Maps each UPDATE action to its corresponding Webfleet read endpoint
+// Maps each UPDATE action to its corresponding Webfleet read endpoint(s)
 const READ_MAP = {
-  updateVehicle:      { readAction: 'showObjectReportExtern', idField: 'objectno'  },
+  updateVehicle:      { readAction: 'showObjectReportExtern', extraAction: 'showVehicleReportExtern', idField: 'objectno'  },
   updateDriverExtern: { readAction: 'showDriverExtern',       idField: 'driverno'  },
   updateAddressExtern:{ readAction: 'showAddressExtern',      idField: 'addrnr'    },
   updateUser:         { readAction: 'showUserExtern',         idField: 'username'  },
 };
+
+async function fetchWfRecords(params, auth) {
+  const resp = await axios.get(BASE, { params, auth });
+  const errCode = resp.headers['x-webfleet-errorcode'];
+  if (errCode && parseInt(errCode) !== 0) {
+    throw new Error('Error ' + errCode + ': ' + decodeURIComponent(resp.headers['x-webfleet-errormessage'] || ''));
+  }
+  return Array.isArray(resp.data) ? resp.data : [];
+}
 
 app.post('/api/diff', upload.single('csvfile'), async (req, res) => {
   const { action, account, username, password, apikey } = req.body;
@@ -623,27 +632,39 @@ app.post('/api/diff', upload.single('csvfile'), async (req, res) => {
     return res.status(400).json({ error: 'CSV inválido: ' + e.message });
   }
 
-  // Fetch ALL current records from Webfleet
-  const params = { account, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action: map.readAction };
-  const auth   = wfAuth(username, password);
-  let currentRecords;
+  const auth = wfAuth(username, password);
+  const baseParams = { account, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es' };
+
+  // Fetch primary records
+  let primaryRecords;
   try {
-    const resp = await axios.get(BASE, { params, auth });
-    const errCode = resp.headers['x-webfleet-errorcode'];
-    if (errCode && parseInt(errCode) !== 0) {
-      throw new Error('Error ' + errCode + ': ' + decodeURIComponent(resp.headers['x-webfleet-errormessage'] || ''));
-    }
-    currentRecords = Array.isArray(resp.data) ? resp.data : [];
+    primaryRecords = await fetchWfRecords({ ...baseParams, action: map.readAction }, auth);
   } catch (e) {
-    return res.status(500).json({ error: 'No se pudo leer el estado actual: ' + e.message });
+    return res.status(500).json({ error: 'No se pudo leer el estado actual (' + map.readAction + '): ' + e.message });
   }
 
-  // Index current records by identifier field
+  // Index primary records by idField
   const index = {};
-  currentRecords.forEach(r => {
-    const key = r[map.idField] || r[map.idField.replace('no','nr')]; // tolerate addrnr vs addrnr
-    if (key) index[String(key).trim()] = r;
+  primaryRecords.forEach(r => {
+    const key = String(r[map.idField] || r[map.idField.replace('no','nr')] || '').trim();
+    if (key) index[key] = { ...r };
   });
+
+  // If there is a supplementary endpoint (e.g. showVehicleReportExtern for updateVehicle),
+  // fetch it and merge its fields so the diff can compare all columns.
+  if (map.extraAction) {
+    try {
+      const extraRecords = await fetchWfRecords({ ...baseParams, action: map.extraAction }, auth);
+      extraRecords.forEach(r => {
+        const key = String(r[map.idField] || '').trim();
+        if (!key) return;
+        if (index[key]) Object.assign(index[key], r);
+        else index[key] = { ...r };
+      });
+    } catch (e) {
+      console.warn('Extra read (' + map.extraAction + ') failed:', e.message);
+    }
+  }
 
   // Build diff per row
   const diff = newRows.map((newRow, i) => {
