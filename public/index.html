@@ -2372,9 +2372,20 @@ function renderDiff(data) {
         + (r.unchangedCount > 0 ? '<div class="diff-unchanged">' + r.unchangedCount + ' ' + t('fieldsWithoutChange') + '</div>' : '')
         + '</div>';
 
+    let badge;
+    if (!r.found) {
+      badge = '<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:3px;background:rgba(251,146,60,.12);color:var(--orange);border:1px solid rgba(251,146,60,.25);">⚠ No encontrado</span>';
+    } else if (r.changes.length === 0) {
+      badge = '<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:3px;background:rgba(255,255,255,.05);color:var(--t3);border:1px solid var(--border);">✓ Sin cambios</span>';
+    } else {
+      badge = '<span style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:3px;background:rgba(0,230,118,.1);color:var(--green);border:1px solid rgba(0,230,118,.2);">↑ ' + r.changes.length + ' cambio' + (r.changes.length > 1 ? 's' : '') + '</span>';
+    }
+
     return '<tr>'
-      + '<td><div class="diff-record-id">' + (r.id || '—') + '</div>'
-      + (!r.found ? '<div class="diff-not-found">' + t('notFoundWarn') + '</div>' : '') + '</td>'
+      + '<td><div style="display:flex;flex-direction:column;gap:5px;">'
+      + '<div class="diff-record-id">' + (r.id || '—') + '</div>'
+      + badge
+      + '</div></td>'
       + '<td>' + changesHtml + '</td>'
       + '</tr>';
   }).join('');
