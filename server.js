@@ -381,9 +381,14 @@ app.post('/api/execute', upload.single('csvfile'), async (req, res) => {
 
   const cfg     = ACTIONS[action];
   const results = [];
+  const idField = Object.keys(records[0])[0];
+
+  // Initialise live progress
+  runProgress = { running: true, total: records.length, done: 0, ok: 0, err: 0, rows: [], action, account, startedAt: new Date().toISOString() };
 
   for (let i = 0; i < records.length; i++) {
     const row = records[i];
+    const rowId = row[idField] || String(i + 1);
 
     // username+password go in BasicAuth header; account+apikey stay as URL params
     const params = { account, apikey, outputformat: 'json', useUTF8: 'true', lang: 'es', action };
@@ -416,15 +421,27 @@ app.post('/api/execute', upload.single('csvfile'), async (req, res) => {
         errorMsg:  isErr ? decodeURIComponent(errMsg || '') : null,
         response:  resp.data,
       });
+
+      // Update live progress
+      runProgress.done++;
+      if (isErr) { runProgress.err++; runProgress.rows.push({ id: rowId, ok: false, msg: 'ERR ' + errCode + ' — ' + decodeURIComponent(errMsg || '') }); }
+      else        { runProgress.ok++;  runProgress.rows.push({ id: rowId, ok: true  }); }
     } catch (e) {
       const errCode = e.response?.headers?.['x-webfleet-errorcode'];
       const errMsg  = e.response?.headers?.['x-webfleet-errormessage'] || e.message;
       results.push({ row: i + 1, data: row, success: false, errorCode, errorMsg: errMsg });
+      runProgress.done++;
+      runProgress.err++;
+      runProgress.rows.push({ id: rowId, ok: false, msg: errMsg });
     }
+
+    // Keep last 200 rows in memory to avoid unbounded growth
+    if (runProgress.rows.length > 200) runProgress.rows = runProgress.rows.slice(-200);
 
     // 100ms pause between calls to respect rate limits
     if (i < records.length - 1) await new Promise(r => setTimeout(r, 100));
   }
+  runProgress.running = false;
 
   const summary = {
     total:   records.length,
@@ -454,6 +471,11 @@ app.post('/api/execute', upload.single('csvfile'), async (req, res) => {
   res.json(summary);
 });
 
+/* ─── PROGRESS ROUTE ─────────────────────────────────────── */
+app.get('/api/progress', (_req, res) => {
+  res.json(runProgress);
+});
+
 /* ─── LOGS ROUTE ──────────────────────────────────────────────────────────── */
 app.get('/api/logs', (_req, res) => {
   try {
@@ -466,6 +488,12 @@ app.get('/api/logs', (_req, res) => {
 
 app.delete('/api/logs', (_req, res) => {
   try { fs.writeFileSync(LOG_FILE, '[]'); } catch {}
+  res.json({ ok: true });
+});
+
+app.post('/api/client-log', express.json(), (req, res) => {
+  const { msg, context } = req.body || {};
+  if (msg) appendLog({ ts: new Date().toISOString(), type: 'client-error', msg: String(msg).slice(0, 500), context: context ? String(context).slice(0, 500) : undefined });
   res.json({ ok: true });
 });
 

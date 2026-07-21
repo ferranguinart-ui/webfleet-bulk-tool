@@ -3009,7 +3009,19 @@ function toast(msg, type) {
   el.textContent = msg;
   el.className = 'toast toast-' + (type || 'ok') + ' show';
   setTimeout(() => el.classList.remove('show'), 3500);
+  if (type === 'err') logClientError(msg);
 }
+
+function logClientError(msg, context) {
+  try { fetch('/api/client-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ msg: String(msg), context: context || '' }) }); } catch (_) {}
+}
+
+window.onerror = function(msg, src, line, col, err) {
+  logClientError(msg, (src || '') + ':' + line + ':' + col + (err ? ' — ' + err.stack : ''));
+};
+window.addEventListener('unhandledrejection', function(e) {
+  logClientError('Unhandled promise rejection: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)));
+});
 
 /* ══════════════════════════════════════════════════════════════════════════
    DASHBOARD
@@ -3416,6 +3428,18 @@ function renderLogs() {
     return;
   }
   container.innerHTML = logsData.map((entry, ei) => {
+    if (entry.type === 'client-error') {
+      const date = new Date(entry.ts).toLocaleString('es-ES');
+      const ctx = entry.context ? `<div style="font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:4px;white-space:pre-wrap;">${entry.context}</div>` : '';
+      return `<div style="background:var(--s1);border:1px solid rgba(237,28,36,.35);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;"></span>
+          <span style="font-size:11px;color:var(--t3);font-family:var(--mono);">${date}</span>
+          <span style="font-size:11px;font-weight:600;color:var(--red);">Error de aplicación</span>
+        </div>
+        <div style="font-size:12px;color:var(--t1);margin-top:6px;">${entry.msg}</div>${ctx}
+      </div>`;
+    }
     const date = new Date(entry.ts).toLocaleString('es-ES');
     const hasErrors = entry.errors > 0;
     const headerColor = hasErrors ? 'var(--red)' : 'var(--green)';
