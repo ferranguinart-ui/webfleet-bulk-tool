@@ -2075,35 +2075,49 @@ function dlTemplate(id) { window.open('/api/template/' + id, '_blank'); }
 
 /* ── Run bulk only changed rows (post-diff) ─────────────────────────────── */
 async function runBulkFiltered() {
-  if (!lastDiff || !csvFile) { runBulk(); return; }
+  try {
+    if (!lastDiff || !csvFile) { runBulk(); return; }
 
-  // Parse CSV client-side, keep only rows with actual changes
-  const text = await csvFile.text();
-  const lines = text.replace(/^﻿/, '').split(/\r?\n/);
-  const header = lines[0];
-  const changedRowNums = new Set(
-    lastDiff.diff.filter(r => r.changes.length > 0).map(r => r.row) // r.row is 1-based data row
-  );
+    const cfg = getConfig();
+    if (!cfg.account || !cfg.apikey) { toast(t('configureFirst'), 'err'); openModal(); return; }
 
-  const filteredLines = [header];
-  lines.slice(1).forEach((line, i) => {
-    if (line.trim() && changedRowNums.has(i + 1)) filteredLines.push(line);
-  });
+    // Parse CSV, keep only rows with real changes
+    const text    = await csvFile.text();
+    const lines   = text.replace(/^﻿/, '').split(/\r?\n/);
+    const header  = lines[0];
+    const changedRowNums = new Set(
+      lastDiff.diff.filter(r => r.changes && r.changes.length > 0).map(r => r.row)
+    );
 
-  if (filteredLines.length <= 1) {
-    toast('No hay filas con cambios que ejecutar.', 'ok');
-    return;
+    const filteredLines = [header];
+    lines.slice(1).forEach((line, i) => {
+      if (line.trim()) {
+        const rowNum = i + 1; // 1-based data row, matches diff r.row
+        if (changedRowNums.has(rowNum)) filteredLines.push(line);
+      }
+    });
+
+    if (filteredLines.length <= 1) {
+      toast('No hay filas con cambios que ejecutar.', 'ok');
+      return;
+    }
+
+    // Build filtered File and swap into csvFile for runBulk
+    const blob = new Blob([filteredLines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const original = csvFile;
+    csvFile  = new File([blob], csvFile.name, { type: 'text/csv' });
+    lastDiff = null;
+
+    // Show run button (runBulk uses it)
+    const runBtn = document.getElementById('runBtn');
+    if (runBtn) { runBtn.style.display = ''; runBtn.disabled = false; }
+
+    await runBulk();
+    csvFile = original;
+  } catch(err) {
+    console.error('runBulkFiltered error:', err);
+    toast('Error al preparar la ejecución: ' + err.message, 'err');
   }
-
-  const filteredBlob = new Blob([filteredLines.join('\n')], { type: 'text/csv' });
-  const filteredFile = new File([filteredBlob], csvFile.name, { type: 'text/csv' });
-
-  // Swap csvFile temporarily, run, restore
-  const original = csvFile;
-  csvFile = filteredFile;
-  lastDiff = null;
-  await runBulk();
-  csvFile = original;
 }
 
 /* ── Run bulk ───────────────────────────────────────────────────────────── */
