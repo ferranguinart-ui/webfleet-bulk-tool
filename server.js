@@ -5,7 +5,20 @@ const multer    = require('multer');
 const { parse } = require('csv-parse/sync');
 const axios     = require('axios');
 const path      = require('path');
+const fs        = require('fs');
 const Anthropic = require('@anthropic-ai/sdk');
+
+/* ─── LOGGING ─────────────────────────────────────────────────────────────── */
+const LOG_FILE = path.join(__dirname, 'operations.log');
+const MAX_LOG_ENTRIES = 500;
+
+function appendLog(entry) {
+  let entries = [];
+  try { entries = JSON.parse(fs.readFileSync(LOG_FILE, 'utf-8')); } catch {}
+  entries.push(entry);
+  if (entries.length > MAX_LOG_ENTRIES) entries = entries.slice(-MAX_LOG_ENTRIES);
+  try { fs.writeFileSync(LOG_FILE, JSON.stringify(entries)); } catch {}
+}
 
 const app    = express();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -413,12 +426,47 @@ app.post('/api/execute', upload.single('csvfile'), async (req, res) => {
     if (i < records.length - 1) await new Promise(r => setTimeout(r, 100));
   }
 
-  res.json({
+  const summary = {
     total:   records.length,
     success: results.filter(r =>  r.success).length,
     errors:  results.filter(r => !r.success).length,
     results,
+  };
+
+  appendLog({
+    ts:      new Date().toISOString(),
+    action,
+    account,
+    total:   summary.total,
+    success: summary.success,
+    errors:  summary.errors,
+    results: results.map(r => ({
+      row:       r.row,
+      id:        Object.values(r.data || {})[0] || '',
+      success:   r.success,
+      errorCode: r.errorCode || null,
+      errorMsg:  r.errorMsg  || null,
+      payload:   r.data,
+      response:  r.response !== undefined ? JSON.stringify(r.response) : null,
+    })),
   });
+
+  res.json(summary);
+});
+
+/* ─── LOGS ROUTE ──────────────────────────────────────────────────────────── */
+app.get('/api/logs', (_req, res) => {
+  try {
+    const entries = JSON.parse(fs.readFileSync(LOG_FILE, 'utf-8'));
+    res.json(entries.reverse()); // newest first
+  } catch {
+    res.json([]);
+  }
+});
+
+app.delete('/api/logs', (_req, res) => {
+  try { fs.writeFileSync(LOG_FILE, '[]'); } catch {}
+  res.json({ ok: true });
 });
 
 /* ─── SNAPSHOT / ROLLBACK ROUTE ──────────────────────────────────────────── */
